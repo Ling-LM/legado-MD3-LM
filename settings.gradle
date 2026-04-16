@@ -50,7 +50,7 @@ dependencyResolutionManagement {
     
     versionCatalogs {
         libs {
-            from("gradle/libs.versions.toml")
+            from files("gradle/libs.versions.toml")
         }
     }
 }
