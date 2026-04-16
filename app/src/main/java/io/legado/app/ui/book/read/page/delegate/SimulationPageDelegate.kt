@@ -377,6 +377,7 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             mMatrix.postTranslate(mBezierControl1.x, mBezierControl1.y)
             
             // 绘制背景和位图
+            canvas.drawColor(ReadBookConfig.bgMeanColor)
             canvas.drawBitmap(bitmap, mMatrix, mPaint)
             mPaint.colorFilter = null
             
