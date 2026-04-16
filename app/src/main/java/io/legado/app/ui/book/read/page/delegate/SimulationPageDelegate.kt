@@ -64,16 +64,7 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
     private var mMiddleY = 0f
     private var mDegrees = 0f
     private var mTouchToCornerDis = 0f
-    private var mColorMatrixFilter = ColorMatrixColorFilter(
-        ColorMatrix(
-            floatArrayOf(
-                1f, 0f, 0f, 0f, 0f,
-                0f, 1f, 0f, 0f, 0f,
-                0f, 0f, 1f, 0f, 0f,
-                0f, 0f, 0f, 1f, 0f
-            )
-        )
-    )
+    private var mColorMatrixFilter: ColorMatrixColorFilter
     private val mMatrix: Matrix = Matrix()
     private val mMatrixArray = floatArrayOf(0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 1f)
 
@@ -107,14 +98,25 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
 
     init {
         //设置颜色数组
-        val color = intArrayOf(0x333333, -0x4fcccccd)
+        val cm = ColorMatrix()
+        val array = floatArrayOf(
+            1f, 0f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f, 0f,
+            0f, 0f, 1f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f
+        )
+        cm.set(array)
+        mColorMatrixFilter = ColorMatrixColorFilter(cm)
+
+        //设置颜色数组
+        val color = intArrayOf(0x333333, 0xb0333333)
         mFolderShadowDrawableRL = GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, color)
         mFolderShadowDrawableRL.gradientType = GradientDrawable.LINEAR_GRADIENT
 
         mFolderShadowDrawableLR = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, color)
         mFolderShadowDrawableLR.gradientType = GradientDrawable.LINEAR_GRADIENT
 
-        mBackShadowColors = intArrayOf(-0xeeeeef, 0x111111)
+        mBackShadowColors = intArrayOf(0xff111111, 0x111111)
         mBackShadowDrawableRL =
             GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, mBackShadowColors)
         mBackShadowDrawableRL.gradientType = GradientDrawable.LINEAR_GRADIENT
@@ -123,7 +125,7 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, mBackShadowColors)
         mBackShadowDrawableLR.gradientType = GradientDrawable.LINEAR_GRADIENT
 
-        mFrontShadowColors = intArrayOf(-0x7feeeeef, 0x111111)
+        mFrontShadowColors = intArrayOf(0x80111111, 0x111111)
         mFrontShadowDrawableVLR =
             GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, mFrontShadowColors)
         mFrontShadowDrawableVLR.gradientType = GradientDrawable.LINEAR_GRADIENT
@@ -140,6 +142,8 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, mFrontShadowColors)
         mFrontShadowDrawableHBT.gradientType = GradientDrawable.LINEAR_GRADIENT
     }
+
+
 
     override fun setBitmap() {
         when (mDirection) {
@@ -314,9 +318,9 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
         bitmap ?: return
         
         // 计算阴影参数
-        val midX = ((mBezierStart1.x + mBezierControl1.x) / 2).toInt()
+        val midX = ((mBezierStart1.x + mBezierControl1.x) * 0.5f).toInt()
         val f1 = abs(midX - mBezierControl1.x)
-        val midY = ((mBezierStart2.y + mBezierControl2.y) / 2).toInt()
+        val midY = ((mBezierStart2.y + mBezierControl2.y) * 0.5f).toInt()
         val f2 = abs(midY - mBezierControl2.y)
         val shadowWidth = min(f1, f2)
         
@@ -358,12 +362,11 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             mPaint.colorFilter = mColorMatrixFilter
             
             // 计算矩阵变换
-            val dis = hypot(
-                mCornerX - mBezierControl1.x.toDouble(),
-                mBezierControl2.y - mCornerY.toDouble()
-            ).toFloat()
-            val f8 = (mCornerX - mBezierControl1.x) / dis
-            val f9 = (mBezierControl2.y - mCornerY) / dis
+            val dx = mCornerX - mBezierControl1.x
+            val dy = mBezierControl2.y - mCornerY
+            val dis = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+            val f8 = dx / dis
+            val f9 = dy / dis
             mMatrixArray[0] = 1 - 2 * f9 * f9
             mMatrixArray[1] = 2 * f8 * f9
             mMatrixArray[3] = mMatrixArray[1]
@@ -403,14 +406,14 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
         }
         
         // 翻起页阴影顶点与touch点的距离
-        val shadowDistance = 25.toFloat() * 1.414
+        val shadowDistance = 25f * 1.414f
         val d1 = shadowDistance * cos(degree)
         val d2 = shadowDistance * sin(degree)
-        val shadowX = (mTouchX + d1).toFloat()
-        val shadowY: Float = if (mIsRtOrLb) {
-            (mTouchY + d2).toFloat()
+        val shadowX = mTouchX + d1
+        val shadowY = if (mIsRtOrLb) {
+            mTouchY + d2
         } else {
-            (mTouchY - d2).toFloat()
+            mTouchY - d2
         }
         
         // 绘制第一个阴影
@@ -430,9 +433,9 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             }
             canvas.clipPath(mPath1, Region.Op.INTERSECT)
 
-            var leftX: Int
-            var rightX: Int
-            var currentPageShadow: GradientDrawable
+            val leftX: Int
+            val rightX: Int
+            val currentPageShadow: GradientDrawable
             if (mIsRtOrLb) {
                 leftX = mBezierControl1.x.toInt()
                 rightX = (mBezierControl1.x + 25).toInt()
@@ -473,6 +476,9 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             }
             canvas.clipPath(mPath1)
 
+            val leftX: Int
+            val rightX: Int
+            val currentPageShadow: GradientDrawable
             if (mIsRtOrLb) {
                 leftX = mBezierControl2.y.toInt()
                 rightX = (mBezierControl2.y + 25).toInt()
@@ -490,7 +496,7 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             
             val temp = if (mBezierControl2.y < 0) (mBezierControl2.y - viewHeight).toDouble()
             else mBezierControl2.y.toDouble()
-            val hmg = hypot(mBezierControl2.x.toDouble(), temp)
+            val hmg = hypot(mBezierControl2.x.toDouble(), temp).toFloat()
             
             if (hmg > mMaxLength) {
                 currentPageShadow.setBounds(
@@ -588,14 +594,17 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
         mPath0.lineTo(mCornerX.toFloat(), mCornerY.toFloat())
         mPath0.close()
 
-        canvas.save()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            canvas.clipOutPath(mPath0)
-        } else {
-            canvas.clipPath(mPath0, Region.Op.XOR)
+        val saveCount = canvas.save()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                canvas.clipOutPath(mPath0)
+            } else {
+                canvas.clipPath(mPath0, Region.Op.XOR)
+            }
+            canvas.drawBitmap(bitmap, 0f, 0f, null)
+        } finally {
+            canvas.restoreToCount(saveCount)
         }
-        canvas.drawBitmap(bitmap, 0f, 0f, null)
-        canvas.restore()
     }
 
     /**
@@ -624,59 +633,28 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
         val deltaX = mCornerX - mMiddleX
         val deltaY = mCornerY - mMiddleY
         
-        // 针对反仿真翻页的右下和右上方位进行特殊优化
-        if (mDirection == PageDirection.PREV && mIsRtOrLb) {
-            // 优化贝塞尔曲线控制点计算，提高这些方位的动画流畅度
-            when (mCornerX) {
-                viewWidth -> {
-                    // 右上方位
-                    mBezierControl1.x = if (deltaX != 0f) {
-                        mMiddleX - deltaY * deltaY / deltaX * 0.9f // 调整系数，使曲线更平滑
-                    } else {
-                        mMiddleX - deltaY * deltaY / 0.1f * 0.9f
-                    }
-                    mBezierControl1.y = cornerYFloat
-                    mBezierControl2.x = cornerXFloat
-                    mBezierControl2.y = if (deltaY != 0f) {
-                        mMiddleY - deltaX * deltaX / deltaY * 0.9f
-                    } else {
-                        mMiddleY - deltaX * deltaX / 0.1f * 0.9f
-                    }
-                }
-                0 -> {
-                    // 右下方位
-                    mBezierControl1.x = if (deltaX != 0f) {
-                        mMiddleX - deltaY * deltaY / deltaX * 0.9f
-                    } else {
-                        mMiddleX - deltaY * deltaY / 0.1f * 0.9f
-                    }
-                    mBezierControl1.y = cornerYFloat
-                    mBezierControl2.x = cornerXFloat
-                    mBezierControl2.y = if (deltaY != 0f) {
-                        mMiddleY - deltaX * deltaX / deltaY * 0.9f
-                    } else {
-                        mMiddleY - deltaX * deltaX / 0.1f * 0.9f
-                    }
-                }
-            }
+        // 计算贝塞尔曲线控制点
+        val scaleFactor = if (mDirection == PageDirection.PREV && mIsRtOrLb) 0.9f else 1.0f
+        
+        val bezierControl1X = if (deltaX != 0f) {
+            mMiddleX - deltaY * deltaY / deltaX * scaleFactor
         } else {
-            // 其他情况使用正常计算逻辑
-            mBezierControl1.x = if (deltaX != 0f) {
-                mMiddleX - deltaY * deltaY / deltaX
-            } else {
-                mMiddleX - deltaY * deltaY / 0.1f
-            }
-            mBezierControl1.y = cornerYFloat
-            mBezierControl2.x = cornerXFloat
-            mBezierControl2.y = if (deltaY != 0f) {
-                mMiddleY - deltaX * deltaX / deltaY
-            } else {
-                mMiddleY - deltaX * deltaX / 0.1f
-            }
+            mMiddleX - deltaY * deltaY / 0.1f * scaleFactor
         }
         
+        val bezierControl2Y = if (deltaY != 0f) {
+            mMiddleY - deltaX * deltaX / deltaY * scaleFactor
+        } else {
+            mMiddleY - deltaX * deltaX / 0.1f * scaleFactor
+        }
+        
+        mBezierControl1.x = bezierControl1X
+        mBezierControl1.y = cornerYFloat
+        mBezierControl2.x = cornerXFloat
+        mBezierControl2.y = bezierControl2Y
+        
         // 计算贝塞尔曲线起点
-        mBezierStart1.x = mBezierControl1.x - (cornerXFloat - mBezierControl1.x) / 2
+        mBezierStart1.x = mBezierControl1.x - (cornerXFloat - mBezierControl1.x) * 0.5f
         mBezierStart1.y = cornerYFloat
 
         // 固定左边上下两个点
@@ -692,94 +670,52 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
                 val f3 = abs(cornerXFloat - mTouchX) * abs(cornerYFloat - mTouchY) / f1
                 mTouchY = abs(cornerYFloat - f3)
 
-                mMiddleX = (mTouchX + mCornerX) / 2
-                mMiddleY = (mTouchY + mCornerY) / 2
+                mMiddleX = (mTouchX + mCornerX) * 0.5f
+                mMiddleY = (mTouchY + mCornerY) * 0.5f
 
                 val newDeltaX = mCornerX - mMiddleX
                 val newDeltaY = mCornerY - mMiddleY
                 
                 // 重新计算贝塞尔曲线控制点
-                if (mDirection == PageDirection.PREV && mIsRtOrLb) {
-                    // 针对反仿真翻页的右下和右上方位进行特殊优化
-                    when (mCornerX) {
-                        viewWidth -> {
-                            // 右上方位
-                            mBezierControl1.x = if (newDeltaX != 0f) {
-                                mMiddleX - newDeltaY * newDeltaY / newDeltaX * 0.9f
-                            } else {
-                                mMiddleX - newDeltaY * newDeltaY / 0.1f * 0.9f
-                            }
-                            mBezierControl1.y = cornerYFloat
-                            mBezierControl2.x = cornerXFloat
-                            mBezierControl2.y = if (newDeltaY != 0f) {
-                                mMiddleY - newDeltaX * newDeltaX / newDeltaY * 0.9f
-                            } else {
-                                mMiddleY - newDeltaX * newDeltaX / 0.1f * 0.9f
-                            }
-                        }
-                        0 -> {
-                            // 右下方位
-                            mBezierControl1.x = if (newDeltaX != 0f) {
-                                mMiddleX - newDeltaY * newDeltaY / newDeltaX * 0.9f
-                            } else {
-                                mMiddleX - newDeltaY * newDeltaY / 0.1f * 0.9f
-                            }
-                            mBezierControl1.y = cornerYFloat
-                            mBezierControl2.x = cornerXFloat
-                            mBezierControl2.y = if (newDeltaY != 0f) {
-                                mMiddleY - newDeltaX * newDeltaX / newDeltaY * 0.9f
-                            } else {
-                                mMiddleY - newDeltaX * newDeltaX / 0.1f * 0.9f
-                            }
-                        }
-                    }
+                val newBezierControl1X = if (newDeltaX != 0f) {
+                    mMiddleX - newDeltaY * newDeltaY / newDeltaX * scaleFactor
                 } else {
-                    // 其他情况使用正常计算逻辑
-                    mBezierControl1.x = if (newDeltaX != 0f) {
-                        mMiddleX - newDeltaY * newDeltaY / newDeltaX
-                    } else {
-                        mMiddleX - newDeltaY * newDeltaY / 0.1f
-                    }
-                    mBezierControl1.y = cornerYFloat
-                    mBezierControl2.x = cornerXFloat
-                    mBezierControl2.y = if (newDeltaY != 0f) {
-                        mMiddleY - newDeltaX * newDeltaX / newDeltaY
-                    } else {
-                        mMiddleY - newDeltaX * newDeltaX / 0.1f
-                    }
+                    mMiddleX - newDeltaY * newDeltaY / 0.1f * scaleFactor
                 }
+                
+                val newBezierControl2Y = if (newDeltaY != 0f) {
+                    mMiddleY - newDeltaX * newDeltaX / newDeltaY * scaleFactor
+                } else {
+                    mMiddleY - newDeltaX * newDeltaX / 0.1f * scaleFactor
+                }
+                
+                mBezierControl1.x = newBezierControl1X
+                mBezierControl1.y = cornerYFloat
+                mBezierControl2.x = cornerXFloat
+                mBezierControl2.y = newBezierControl2Y
 
-                mBezierStart1.x = mBezierControl1.x - (cornerXFloat - mBezierControl1.x) / 2
+                mBezierStart1.x = mBezierControl1.x - (cornerXFloat - mBezierControl1.x) * 0.5f
             }
         }
         
         mBezierStart2.x = cornerXFloat
-        mBezierStart2.y = mBezierControl2.y - (cornerYFloat - mBezierControl2.y) / 2
+        mBezierStart2.y = mBezierControl2.y - (cornerYFloat - mBezierControl2.y) * 0.5f
 
-        mTouchToCornerDis = hypot(
-            (mTouchX - mCornerX).toDouble(),
-            (mTouchY - mCornerY).toDouble()
-        ).toFloat()
+        // 计算触摸点到角落的距离
+        val dx = mTouchX - mCornerX
+        val dy = mTouchY - mCornerY
+        mTouchToCornerDis = hypot(dx, dy)
 
         // 计算贝塞尔曲线终点
-        mBezierEnd1 = getCross(
-            tempPointF.apply { set(mTouchX, mTouchY) }, 
-            mBezierControl1, 
-            mBezierStart1,
-            mBezierStart2
-        )
-        mBezierEnd2 = getCross(
-            tempPointF.apply { set(mTouchX, mTouchY) }, 
-            mBezierControl2, 
-            mBezierStart1,
-            mBezierStart2
-        )
+        tempPointF.set(mTouchX, mTouchY)
+        mBezierEnd1 = getCross(tempPointF, mBezierControl1, mBezierStart1, mBezierStart2)
+        mBezierEnd2 = getCross(tempPointF, mBezierControl2, mBezierStart1, mBezierStart2)
 
         // 计算贝塞尔曲线顶点
-        mBezierVertex1.x = (mBezierStart1.x + 2 * mBezierControl1.x + mBezierEnd1.x) / 4
-        mBezierVertex1.y = (2 * mBezierControl1.y + mBezierStart1.y + mBezierEnd1.y) / 4
-        mBezierVertex2.x = (mBezierStart2.x + 2 * mBezierControl2.x + mBezierEnd2.x) / 4
-        mBezierVertex2.y = (2 * mBezierControl2.y + mBezierStart2.y + mBezierEnd2.y) / 4
+        mBezierVertex1.x = (mBezierStart1.x + 2 * mBezierControl1.x + mBezierEnd1.x) * 0.25f
+        mBezierVertex1.y = (2 * mBezierControl1.y + mBezierStart1.y + mBezierEnd1.y) * 0.25f
+        mBezierVertex2.x = (mBezierStart2.x + 2 * mBezierControl2.x + mBezierEnd2.x) * 0.25f
+        mBezierVertex2.y = (2 * mBezierControl2.y + mBezierStart2.y + mBezierEnd2.y) * 0.25f
     }
 
     private val crossPointF = PointF()
@@ -789,10 +725,16 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
      */
     private fun getCross(P1: PointF, P2: PointF, P3: PointF, P4: PointF): PointF {
         // 二元函数通式： y=ax+b
-        val a1 = (P2.y - P1.y) / (P2.x - P1.x)
+        val deltaX1 = P2.x - P1.x
+        val deltaY1 = P2.y - P1.y
+        val deltaX2 = P4.x - P3.x
+        val deltaY2 = P4.y - P3.y
+        
+        val a1 = deltaY1 / deltaX1
         val b1 = (P1.x * P2.y - P2.x * P1.y) / (P1.x - P2.x)
-        val a2 = (P4.y - P3.y) / (P4.x - P3.x)
+        val a2 = deltaY2 / deltaX2
         val b2 = (P3.x * P4.y - P4.x * P3.y) / (P3.x - P4.x)
+        
         crossPointF.x = (b2 - b1) / (a1 - a2)
         crossPointF.y = a1 * crossPointF.x + b1
         return crossPointF
