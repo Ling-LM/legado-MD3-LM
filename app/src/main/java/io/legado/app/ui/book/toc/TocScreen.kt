@@ -99,11 +99,12 @@ import io.legado.app.ui.theme.adaptiveHorizontalPadding
 import io.legado.app.ui.widget.CollapsibleHeader
 import io.legado.app.ui.widget.components.ActionItem
 import io.legado.app.ui.widget.components.AppScaffold
-import io.legado.app.ui.widget.components.EmptyMessageView
+import io.legado.app.ui.widget.components.EmptyMessage
 import io.legado.app.ui.widget.components.SelectionBottomBar
 import io.legado.app.ui.widget.components.bookmark.BookmarkEditSheet
 import io.legado.app.ui.widget.components.bookmark.BookmarkItem
 import io.legado.app.ui.widget.components.button.SmallOutlinedIconToggleButton
+import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.card.TextCard
 import io.legado.app.ui.widget.components.divider.PillDivider
 import io.legado.app.ui.widget.components.divider.PillHeaderDivider
@@ -864,7 +865,7 @@ fun BookmarkListContent(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            EmptyMessageView(
+            EmptyMessage(
                 message = "暂无书签"
             )
         }
@@ -950,13 +951,13 @@ private fun StatusIcon(
             }
 
             "SUCCESS_WORD_COUNT" -> {
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
+                NormalCard(
+                    cornerRadius = 12.dp,
                     border = BorderStroke(
                         1.dp,
                         LegadoTheme.colorScheme.outlineVariant
                     ),
-                    color = Color.Transparent
+                    containerColor = Color.Transparent
                 ) {
                     if (wordCount != null) {
                         AppText(

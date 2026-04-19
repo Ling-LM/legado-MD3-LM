@@ -69,13 +69,12 @@ import cn.hutool.core.date.DateUtil
 import io.legado.app.data.entities.readRecord.ReadRecord
 import io.legado.app.data.entities.readRecord.ReadRecordDetail
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.theme.adaptiveContentPadding
 import io.legado.app.ui.theme.adaptiveContentPaddingOnlyVertical
 import io.legado.app.ui.theme.adaptiveHorizontalPadding
 import io.legado.app.ui.widget.CollapsibleHeader
 import io.legado.app.ui.widget.components.AppScaffold
-import io.legado.app.ui.widget.components.EmptyMessageView
-import io.legado.app.ui.widget.components.SearchBarSection
+import io.legado.app.ui.widget.components.EmptyMessage
+import io.legado.app.ui.widget.components.SearchBar
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.AppIconButton
 import io.legado.app.ui.widget.components.button.TopBarNavigationButton
@@ -103,6 +102,7 @@ import io.legado.app.ui.widget.components.swipe.SwipeActionContainer
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
+import io.legado.app.utils.formatReadDuration
 import io.legado.app.utils.StringUtils.formatFriendlyDate
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
@@ -227,7 +227,7 @@ fun ReadRecordScreen(
                     modifier = Modifier.adaptiveHorizontalPadding(),
                     visible = showSearch
                 ) {
-                    SearchBarSection(
+                    SearchBar(
                         query = state.searchKey ?: "",
                         onQueryChange = { viewModel.setSearchKey(it) }
                     )
@@ -248,7 +248,7 @@ fun ReadRecordScreen(
         ) { targetState ->
             when (targetState) {
                 "LOADING" -> {
-                    EmptyMessageView(
+                    EmptyMessage(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(
@@ -261,7 +261,7 @@ fun ReadRecordScreen(
                 }
 
                 "EMPTY" -> {
-                    EmptyMessageView(
+                    EmptyMessage(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(
@@ -1045,13 +1045,5 @@ fun BookStackView(coverPaths: List<String?>) {
 }
 
 fun formatDuring(mss: Long): String {
-    val days = mss / (1000 * 60 * 60 * 24)
-    val hours = mss % (1000 * 60 * 60 * 24) / (1000 * 60 * 60)
-    val minutes = mss % (1000 * 60 * 60) / (1000 * 60)
-    val seconds = mss % (1000 * 60) / 1000
-    val d = if (days > 0) "${days}天" else ""
-    val h = if (hours > 0) "${hours}小时" else ""
-    val m = if (minutes > 0) "${minutes}分钟" else ""
-    val s = if (seconds > 0) "${seconds}秒" else ""
-    return if ("$d$h$m$s".isBlank()) "0秒" else "$d$h$m$s"
+    return formatReadDuration(mss)
 }

@@ -246,6 +246,7 @@
     <string name="threads_num_title">更新和搜索线程数</string>
     <string name="change_icon">切换图标</string>
     <string name="remove_from_bookshelf">已在书架</string>
+    <string name="already_in_bookshelf">已在书架</string>
     <string name="start_read">开始阅读</string>
     <string name="data_loading">加载数据中…</string>
     <string name="load_error_retry">加载失败</string>
@@ -395,6 +396,7 @@
     <string name="imm_navigation_bar_s">导航栏颜色透明</string>
     <string name="add_to_bookshelf">放入书架</string>
     <string name="click_to_remove">点击删除</string>
+    <string name="long_press_group">长按分组</string>
     <string name="continue_read">继续阅读</string>
     <string name="cover_path">封面地址</string>
     <string name="page_anim_cover">覆盖</string>
@@ -1425,4 +1427,14 @@
     <string name="enable_select_vibrator">选择文本时震动</string>
     <string name="re_sync_webdav">重新同步远程书籍</string>
     <string name="underline_padding">离字间距</string>
+	<string name="layout_setting">布局设置</string>
+	<string name="cover_info_orientation">封面信息方向</string>
+	<string name="rule_segment">Rule</string>
+	<string name="tool_bar_style">工具栏样式</string>
+	<string name="split_title">标题分段</string>
+	<string name="split_title_mode">分段模式</string>
+	<string name="subtitle_scale">次行缩放</string>
+	<string name="subtitle_margin">次行距离</string>
+	<string name="heading_spacing">标题段距</string>
+    <string name="follow_read_background">跟随阅读背景</string>
 </resources>
