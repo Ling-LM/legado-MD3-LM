@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -23,19 +24,14 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PauseCircleOutline
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.FolderZip
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -49,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
@@ -65,16 +60,16 @@ import io.legado.app.ui.book.group.GroupEditSheet
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
 import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.ui.theme.LegadoTheme
+import io.legado.app.ui.widget.components.AppLinearProgressIndicator
 import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.ConfirmDismissButtonsRow
 import io.legado.app.ui.widget.components.button.MediumIconButton
 import io.legado.app.ui.widget.components.button.SmallIconButton
-import io.legado.app.ui.widget.components.button.TopBarButton
 import io.legado.app.ui.widget.components.card.GlassCard
 import io.legado.app.ui.widget.components.card.SelectionItemCard
 import io.legado.app.ui.widget.components.checkBox.AppCheckbox
-import io.legado.app.ui.widget.components.cover.BookCover
+import io.legado.app.ui.widget.components.cover.CoilBookCover
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
@@ -134,53 +129,58 @@ fun GroupSelectSheet(
         title = stringResource(R.string.group_select),
         endAction = { IconButton(onClick = { editingGroup = BookGroup() }) { Icon(Icons.Default.Add, null) } }
     ) {
-        LazyColumn(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(groups, key = { it.groupId }) { group ->
-                val isSelected = selectedGroupId and group.groupId > 0
-                SelectionItemCard(
-                    title = group.groupName,
-                    isSelected = isSelected,
-                    onToggleSelection = {
-                        selectedGroupId = if (isSelected) {
-                            selectedGroupId - group.groupId
-                        } else {
-                            selectedGroupId + group.groupId
-                        }
-                    },
-                    leadingContent = {
-                        AppCheckbox(
-                            checked = isSelected,
-                            onCheckedChange = {
-                                selectedGroupId = if (it) {
-                                    selectedGroupId + group.groupId
-                                } else {
-                                    selectedGroupId - group.groupId
-                                }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 560.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(groups, key = { it.groupId }) { group ->
+                    val isSelected = selectedGroupId and group.groupId > 0
+                    SelectionItemCard(
+                        title = group.groupName,
+                        isSelected = isSelected,
+                        onToggleSelection = {
+                            selectedGroupId = if (isSelected) {
+                                selectedGroupId - group.groupId
+                            } else {
+                                selectedGroupId + group.groupId
                             }
-                        )
-                    },
-                    trailingAction = {
-                        SmallIconButton(
-                            onClick = { editingGroup = group },
-                            imageVector = Icons.Default.Edit
-                        )
-                    },
-                    containerColor = LegadoTheme.colorScheme.surfaceContainerLow
-                )
+                        },
+                        leadingContent = {
+                            AppCheckbox(
+                                checked = isSelected,
+                                onCheckedChange = {
+                                    selectedGroupId = if (it) {
+                                        selectedGroupId + group.groupId
+                                    } else {
+                                        selectedGroupId - group.groupId
+                                    }
+                                }
+                            )
+                        },
+                        trailingAction = {
+                            SmallIconButton(
+                                onClick = { editingGroup = group },
+                                imageVector = Icons.Default.Edit
+                            )
+                        },
+                        containerColor = LegadoTheme.colorScheme.surfaceContainerLow
+                    )
+                }
             }
+            Spacer(modifier = Modifier.height(12.dp))
+            ConfirmDismissButtonsRow(
+                onDismiss = onDismissRequest,
+                onConfirm = { onConfirm(selectedGroupId) },
+                dismissText = stringResource(R.string.cancel),
+                confirmText = stringResource(R.string.ok),
+            )
+            Spacer(modifier = Modifier.height(12.dp))
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        ConfirmDismissButtonsRow(
-            onDismiss = onDismissRequest,
-            onConfirm = { onConfirm(selectedGroupId) },
-            dismissText = stringResource(R.string.cancel),
-            confirmText = stringResource(R.string.ok),
-        )
-        Spacer(modifier = Modifier.height(12.dp))
     }
-
     GroupEditSheet(show = editingGroup != null, group = editingGroup, onDismissRequest = { editingGroup = null })
 }
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ChangeCoverSheet(
@@ -221,7 +221,7 @@ fun ChangeCoverSheet(
             items(items, key = { it.bookUrl + it.originName }) { item ->
                 GlassCard(onClick = { onSelect(item.coverUrl.orEmpty()) }) {
                     Column(modifier = Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BookCover(name = item.name, author = item.author, path = item.coverUrl, sourceOrigin = item.origin, modifier = Modifier.fillMaxWidth())
+                        CoilBookCover(name = item.name, author = item.author, path = item.coverUrl, sourceOrigin = item.origin, modifier = Modifier.fillMaxWidth())
                         AppText(text = item.originName, style = LegadoTheme.typography.bodySmall, maxLines = 2)
                     }
                 }
@@ -376,7 +376,7 @@ fun ChangeSourceSheet(
         )
         Spacer(modifier = Modifier.height(12.dp))
         if (isSearching) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            AppLinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Spacer(modifier = Modifier.height(8.dp))
             AppText(
                 text = "${progress.first} / ${viewModel.totalSourceCount} · ${items.size}",
@@ -391,8 +391,8 @@ fun ChangeSourceSheet(
                 }.collectAsStateWithLifecycle()
                 SelectionItemCard(
                     title = item.originName,
-                    containerColor = LegadoTheme.colorScheme.surfaceContainer,
-                    selectedContainerColor = LegadoTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+                    containerColor = LegadoTheme.colorScheme.onSheetContent,
+                    selectedContainerColor = LegadoTheme.colorScheme.primaryContainer.copy(alpha = 0.32f),
                     leadingContent = {
                         MediumIconButton(
                             onClick = {
@@ -496,15 +496,35 @@ fun ChangeSourceSheet(
         })
     }
 
-    if (mismatchBook != null) {
-        AppAlertDialog(show = true, onDismissRequest = { mismatchBook = null }, title = stringResource(R.string.book_type_different), text = stringResource(R.string.soure_change_source), confirmText = stringResource(android.R.string.ok), onConfirm = { actionBook = mismatchBook; mismatchBook = null }, dismissText = stringResource(android.R.string.cancel), onDismiss = { mismatchBook = null })
-    }
-    actionBook?.let { searchBook ->
-        AppAlertDialog(show = true, onDismissRequest = { actionBook = null }, title = stringResource(R.string.change_source_option_title), dismissText = stringResource(R.string.add_as_new_book), onDismiss = { performAction(searchBook, false) }, confirmText = stringResource(R.string.replace_current_book), onConfirm = { performAction(searchBook, true) })
-    }
-    if (loadingAction) {
-        AppAlertDialog(show = true, onDismissRequest = {}, content = {
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        })
-    }
+    AppAlertDialog(
+        data = mismatchBook,
+        onDismissRequest = { mismatchBook = null },
+        title = stringResource(R.string.book_type_different),
+        text = stringResource(R.string.soure_change_source),
+        confirmText = stringResource(android.R.string.ok),
+        onConfirm = { searchBook ->
+            actionBook = searchBook
+            mismatchBook = null
+        },
+        dismissText = stringResource(android.R.string.cancel),
+        onDismiss = { mismatchBook = null }
+    )
+    AppAlertDialog(
+        data = actionBook,
+        onDismissRequest = { actionBook = null },
+        title = stringResource(R.string.change_source_option_title),
+        dismissText = stringResource(R.string.add_as_new_book),
+        onDismiss = { actionBook?.let { performAction(it, false) } },
+        confirmText = stringResource(R.string.replace_current_book),
+        onConfirm = { performAction(it, true) }
+    )
+    AppAlertDialog(
+        show = loadingAction,
+        onDismissRequest = {},
+        content = {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+    )
 }

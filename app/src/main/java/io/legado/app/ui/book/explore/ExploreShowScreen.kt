@@ -10,22 +10,16 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -35,21 +29,17 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -63,14 +53,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import io.legado.app.data.entities.SearchBook
@@ -81,17 +68,18 @@ import io.legado.app.ui.theme.ThemeResolver
 import io.legado.app.ui.theme.responsiveHazeEffect
 import io.legado.app.ui.theme.responsiveHazeSource
 import io.legado.app.ui.widget.components.AppScaffold
-import io.legado.app.ui.widget.components.SearchBarSection
+import io.legado.app.ui.widget.components.SearchBar
 import io.legado.app.ui.widget.components.button.AnimatedTextButton
 import io.legado.app.ui.widget.components.button.TopBarActionButton
 import io.legado.app.ui.widget.components.button.TopBarNavigationButton
 import io.legado.app.ui.widget.components.card.TextCard
-import io.legado.app.ui.widget.components.cover.Cover
 import io.legado.app.ui.widget.components.explore.calculateExploreKindRows
 import io.legado.app.ui.widget.components.explore.ExploreKindMultiTypeItem
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
+import io.legado.app.ui.widget.components.book.SearchBookGridItem
+import io.legado.app.ui.widget.components.book.SearchBookListItem
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
@@ -252,7 +240,7 @@ fun ExploreShowScreen(
 
         var kindQuery by remember { mutableStateOf("") }
 
-        SearchBarSection(
+        SearchBar(
             query = kindQuery,
             backgroundColor = LegadoTheme.colorScheme.surface.copy(alpha = 0.5f),
             onQueryChange = { kindQuery = it },
@@ -521,111 +509,12 @@ fun ExploreBookItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shelfState by shelfState.collectAsState(initial = BookShelfState.NOT_IN_SHELF)
-
-    val badge: (@Composable RowScope.() -> Unit)?
-            = when (shelfState) {
-
-        BookShelfState.IN_SHELF -> {
-            {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "已在书架",
-                    modifier = Modifier.size(12.dp)
-                )
-            }
-        }
-
-        BookShelfState.SAME_NAME_AUTHOR -> {
-            {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = "同名书籍",
-                    modifier = Modifier.size(12.dp)
-                )
-
-            }
-        }
-
-        BookShelfState.NOT_IN_SHELF -> null
-    }
-
-    Row(
+    SearchBookListItem(
+        book = book,
+        shelfState = shelfState,
+        onClick = onClick,
         modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-
-        Cover(
-            path = book.coverUrl,
-            modifier = Modifier.width(72.dp),
-            badgeContent = badge)
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Column(modifier = Modifier
-            .weight(1f)
-            .align(Alignment.CenterVertically)) {
-
-            AppText(
-                text = book.name,
-                style = LegadoTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Row {
-                AppText(
-                    text = book.author,
-                    style = LegadoTheme.typography.bodySmall,
-                    maxLines = 1
-                )
-
-                val latestChapter = book.latestChapterTitle
-                if (!latestChapter.isNullOrEmpty()) {
-                    AppText(
-                        text = " • ",
-                        style = LegadoTheme.typography.bodySmall,
-                        color = Color.Gray,
-                        maxLines = 1
-                    )
-
-                    AppText(
-                        text = "最新: $latestChapter",
-                        style = LegadoTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            val intro = book.intro?.replace("\\s+".toRegex(), "") ?: ""
-            if (intro.isNotEmpty()) {
-                AppText(
-                    text = intro,
-                    style = LegadoTheme.typography.labelSmall,
-                    color = Color.Gray,
-                    maxLines = 2,
-                    minLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            val kinds = book.getKindList()
-            if (kinds.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    kinds.forEach { kind ->
-                        TagChip(text = kind)
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-                }
-            }
-        }
-    }
+    )
 }
 
 @Composable
@@ -635,71 +524,12 @@ fun ExploreBookGridItem(
     shelfState: Flow<BookShelfState>,
     modifier: Modifier = Modifier
 ) {
-
-    val shelfState by shelfState.collectAsState(initial = BookShelfState.NOT_IN_SHELF)
-
-    val badgeText: String? = when (shelfState) {
-        BookShelfState.IN_SHELF -> "已在书架"
-        BookShelfState.SAME_NAME_AUTHOR -> "同名书籍"
-        BookShelfState.NOT_IN_SHELF -> null
-    }
-
-    val content: (@Composable RowScope.() -> Unit)? = if (!badgeText.isNullOrBlank()) {
-        {
-            AppText(
-                text = badgeText,
-                style = LegadoTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp
-                )
-            )
-        }
-    } else {
-        null
-    }
-
-    Column(
+    SearchBookGridItem(
+        book = book,
+        shelfState = shelfState,
+        onClick = onClick,
         modifier = modifier
-            .width(IntrinsicSize.Min)
-            .clip(RoundedCornerShape(4.dp))
-            .clickable(onClick = onClick)
-            .padding(4.dp)
-    ) {
-
-        Cover(
-            path = book.coverUrl,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(12 / 17f),
-            badgeContent = content
-        )
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        AppText(
-            text = book.name,
-            style = LegadoTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-// 简单的标签组件
-@Composable
-fun TagChip(text: String) {
-    Surface(
-        color = LegadoTheme.colorScheme.cardContainer,
-        shape = RoundedCornerShape(4.dp)
-    ) {
-        AppText(
-            text = text,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-            style = LegadoTheme.typography.labelSmall,
-            color = LegadoTheme.colorScheme.onCardContainer
-        )
-    }
+    )
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

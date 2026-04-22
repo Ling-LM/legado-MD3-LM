@@ -13,6 +13,8 @@ import io.legado.app.data.repository.ExploreRepository
 import io.legado.app.data.repository.ExploreRepositoryImpl
 import io.legado.app.data.repository.ReadRecordRepository
 import io.legado.app.data.repository.RemoteBookRepository
+import io.legado.app.data.repository.SearchRepository
+import io.legado.app.data.repository.SearchRepositoryImpl
 import io.legado.app.data.repository.SearchContentRepository
 import io.legado.app.data.repository.UploadRepository
 import io.legado.app.domain.usecase.ExploreKindUiUseCase
@@ -30,6 +32,7 @@ import io.legado.app.ui.book.import.local.ImportBookViewModel
 import io.legado.app.ui.book.import.remote.RemoteBookViewModel
 import io.legado.app.ui.book.info.BookInfoViewModel
 import io.legado.app.ui.book.readRecord.ReadRecordViewModel
+import io.legado.app.ui.book.search.SearchViewModel
 import io.legado.app.ui.book.searchContent.SearchContentViewModel
 import io.legado.app.ui.book.toc.TocViewModel
 import io.legado.app.ui.book.toc.rule.TxtTocRuleViewModel
@@ -48,6 +51,9 @@ import io.legado.app.ui.replace.ReplaceEditRoute
 import io.legado.app.ui.replace.ReplaceRuleViewModel
 import io.legado.app.ui.replace.edit.ReplaceEditViewModel
 import io.legado.app.ui.rss.source.manage.RssSourceViewModel
+import io.legado.app.ui.rss.article.RssArticlesViewModel
+import io.legado.app.ui.rss.article.RssSortViewModel
+import io.legado.app.ui.rss.read.ReadRssViewModel
 import org.koin.core.module.dsl.singleOf
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
@@ -69,6 +75,7 @@ val appModule = module {
 
     single<UploadRepository> { DirectLinkUploadRepository() }
     single<ExploreRepository> { ExploreRepositoryImpl(get()) }
+    single<SearchRepository> { SearchRepositoryImpl(get()) }
 
     single<ImageLoader> {
         ImageLoader.Builder(get())
@@ -88,6 +95,9 @@ val appModule = module {
 
     viewModelOf(::DictRuleViewModel)
     viewModelOf(::RssSourceViewModel)
+    viewModelOf(::RssSortViewModel)
+    viewModelOf(::RssArticlesViewModel)
+    viewModelOf(::ReadRssViewModel)
     viewModelOf(::ReadRecordViewModel)
     viewModelOf(::ExploreShowViewModel)
     viewModelOf(::MyViewModel)
@@ -111,6 +121,7 @@ val appModule = module {
     viewModelOf(::ChangeBookSourceViewModel)
     viewModelOf(::ExploreViewModel)
     viewModelOf(::RssViewModel)
+    viewModelOf(::SearchViewModel)
 
     viewModel { (route: ReplaceEditRoute) ->
         ReplaceEditViewModel(
@@ -122,3 +133,4 @@ val appModule = module {
 
     viewModelOf(::SearchContentViewModel)
 }
+

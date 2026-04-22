@@ -91,7 +91,9 @@ fun MainScreen(
     useRail: Boolean,
     onOpenSettings: () -> Unit,
     onNavigateToRemoteImport: () -> Unit,
-    onNavigateToLocalImport: () -> Unit
+    onNavigateToLocalImport: () -> Unit,
+    onNavigateToRssSort: (sourceUrl: String, sortUrl: String?, key: String?) -> Unit,
+    onNavigateToRssRead: (title: String?, origin: String, link: String?, openUrl: String?) -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -315,7 +317,6 @@ fun MainScreen(
                         AppNavigationBar(
                             modifier = Modifier
                                 .regularHazeEffect(state = hazeState)
-                                .height(if (isUnlabeled) 64.dp else 80.dp)
                         ) {
                             destinations.forEachIndexed { index, destination ->
                                 val selected = pagerState.targetPage == index
@@ -381,7 +382,14 @@ fun MainScreen(
                         )
 
                         MainDestination.Explore -> ExploreScreen()
-                        MainDestination.Rss -> RssScreen()
+                        MainDestination.Rss -> RssScreen(
+                            onOpenSort = { sourceUrl, sortUrl, key ->
+                                onNavigateToRssSort(sourceUrl, sortUrl, key)
+                            },
+                            onOpenRead = { title, origin, link, openUrl ->
+                                onNavigateToRssRead(title, origin, link, openUrl)
+                            }
+                        )
                         MainDestination.My -> MyScreen(
                             viewModel = koinViewModel(),
                             onOpenSettings = onOpenSettings,
