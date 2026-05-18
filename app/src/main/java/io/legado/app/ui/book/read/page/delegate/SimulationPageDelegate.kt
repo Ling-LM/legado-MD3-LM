@@ -11,6 +11,7 @@ import android.graphics.Region
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.view.MotionEvent
+import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.ui.book.read.page.ReadView
 import io.legado.app.ui.book.read.page.entities.PageDirection
 import io.legado.app.utils.screenshot
@@ -52,9 +53,6 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
     private var mIsRtOrLb = false
     private var mMaxLength = hypot(viewWidth.toDouble(), viewHeight.toDouble()).toFloat()
 
-    private val mBackShadowColors: IntArray
-    private val mFrontShadowColors: IntArray
-
     private val mBackShadowDrawableLR: GradientDrawable
     private val mBackShadowDrawableRL: GradientDrawable
     private val mFolderShadowDrawableLR: GradientDrawable
@@ -73,8 +71,10 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
     private var canvas: Canvas = Canvas()
 
     private val tempPointF = PointF()
-    private val crossPointF1 = PointF()
-    private val crossPointF2 = PointF()
+
+    private var mLastTouchX = 0f
+    private var mLastTouchY = 0f
+    private var mPointsCalculated = false
 
     init {
         val cm = ColorMatrix()
@@ -94,30 +94,30 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
         mFolderShadowDrawableLR = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, color)
         mFolderShadowDrawableLR.gradientType = GradientDrawable.LINEAR_GRADIENT
 
-        mBackShadowColors = intArrayOf(0xff111111.toInt(), 0x111111)
+        val backShadowColors = intArrayOf(0xff111111.toInt(), 0x111111)
         mBackShadowDrawableRL =
-            GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, mBackShadowColors)
+            GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, backShadowColors)
         mBackShadowDrawableRL.gradientType = GradientDrawable.LINEAR_GRADIENT
 
         mBackShadowDrawableLR =
-            GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, mBackShadowColors)
+            GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, backShadowColors)
         mBackShadowDrawableLR.gradientType = GradientDrawable.LINEAR_GRADIENT
 
-        mFrontShadowColors = intArrayOf(0x80111111.toInt(), 0x111111)
+        val frontShadowColors = intArrayOf(0x80111111.toInt(), 0x111111)
         mFrontShadowDrawableVLR =
-            GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, mFrontShadowColors)
+            GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, frontShadowColors)
         mFrontShadowDrawableVLR.gradientType = GradientDrawable.LINEAR_GRADIENT
 
         mFrontShadowDrawableVRL =
-            GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, mFrontShadowColors)
+            GradientDrawable(GradientDrawable.Orientation.RIGHT_LEFT, frontShadowColors)
         mFrontShadowDrawableVRL.gradientType = GradientDrawable.LINEAR_GRADIENT
 
         mFrontShadowDrawableHTB =
-            GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, mFrontShadowColors)
+            GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, frontShadowColors)
         mFrontShadowDrawableHTB.gradientType = GradientDrawable.LINEAR_GRADIENT
 
         mFrontShadowDrawableHBT =
-            GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, mFrontShadowColors)
+            GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, frontShadowColors)
         mFrontShadowDrawableHBT.gradientType = GradientDrawable.LINEAR_GRADIENT
     }
 
@@ -145,6 +145,7 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 calcCornerXY(event.x, event.y)
+                mPointsCalculated = false
             }
             MotionEvent.ACTION_MOVE -> {
                 if ((startY > viewHeight / 3 && startY < viewHeight * 2 / 3)
@@ -163,6 +164,7 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
 
     override fun setDirection(direction: PageDirection) {
         super.setDirection(direction)
+        mPointsCalculated = false
         when (direction) {
             PageDirection.PREV ->
                 if (startX > viewWidth / 2) {
@@ -207,6 +209,7 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
                 (1 - touchY).toInt()
             }
         }
+        mPointsCalculated = false
         startScroll(touchX.toInt(), touchY.toInt(), dx, dy, animationSpeed)
     }
 
@@ -219,7 +222,14 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
     override fun onDraw(canvas: Canvas) {
         if (!isRunning) return
 
-        calcPoints()
+        val tx = touchX
+        val ty = touchY
+        if (!mPointsCalculated || mLastTouchX != tx || mLastTouchY != ty) {
+            mLastTouchX = tx
+            mLastTouchY = ty
+            calcPoints()
+            mPointsCalculated = true
+        }
 
         when (mDirection) {
             PageDirection.NEXT -> {
@@ -277,6 +287,8 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
                 canvas.clipPath(mPath1, Region.Op.INTERSECT)
             }
 
+            canvas.drawColor(ReadBookConfig.bgMeanColor)
+
             mPaint.colorFilter = mColorMatrixFilter
 
             val dx = mCornerX - mBezierControl1.x
@@ -314,9 +326,8 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             Math.PI / 4 - atan2((mTouchY - mBezierControl1.y).toDouble(), (mTouchX - mBezierControl1.x).toDouble())
         }
 
-        val shadowLen = 25.0 * 1.414
-        val d1 = shadowLen * cos(degree)
-        val d2 = shadowLen * sin(degree)
+        val d1 = 35.355 * cos(degree)
+        val d2 = 35.355 * sin(degree)
         val x = (mTouchX + d1).toFloat()
         val y = if (mIsRtOrLb) (mTouchY + d2).toFloat() else (mTouchY - d2).toFloat()
 
@@ -336,9 +347,9 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             }
             canvas.clipPath(mPath1, Region.Op.INTERSECT)
 
-            var leftX: Int
-            var rightX: Int
-            var currentPageShadow: GradientDrawable
+            val leftX: Int
+            val rightX: Int
+            val currentPageShadow: GradientDrawable
             if (mIsRtOrLb) {
                 leftX = mBezierControl1.x.toInt()
                 rightX = (mBezierControl1.x + 25).toInt()
@@ -378,9 +389,9 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
             }
             canvas.clipPath(mPath1)
 
-            var leftX: Int
-            var rightX: Int
-            var currentPageShadow: GradientDrawable
+            val leftX: Int
+            val rightX: Int
+            val currentPageShadow: GradientDrawable
             if (mIsRtOrLb) {
                 leftX = mBezierControl2.y.toInt()
                 rightX = (mBezierControl2.y + 25).toInt()
@@ -504,15 +515,17 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
         mMiddleX = (mTouchX + mCornerX) * 0.5f
         mMiddleY = (mTouchY + mCornerY) * 0.5f
 
-        mBezierControl1.x =
-            mMiddleX - (mCornerY - mMiddleY) * (mCornerY - mMiddleY) / (mCornerX - mMiddleX)
+        val deltaY = mCornerY - mMiddleY
+        val deltaX = mCornerX - mMiddleX
+
+        mBezierControl1.x = mMiddleX - deltaY * deltaY / deltaX
         mBezierControl1.y = mCornerY.toFloat()
 
         mBezierControl2.x = mCornerX.toFloat()
-        if (mCornerY - mMiddleY == 0f) {
-            mBezierControl2.y = mMiddleY - (mCornerX - mMiddleX) * (mCornerX - mMiddleX) / 0.1f
+        mBezierControl2.y = if (deltaY == 0f) {
+            mMiddleY - deltaX * deltaX / 0.1f
         } else {
-            mBezierControl2.y = mMiddleY - (mCornerX - mMiddleX) * (mCornerX - mMiddleX) / (mCornerY - mMiddleY)
+            mMiddleY - deltaX * deltaX / deltaY
         }
 
         mBezierStart1.x = mBezierControl1.x - (mCornerX - mBezierControl1.x) * 0.5f
@@ -533,16 +546,17 @@ class SimulationPageDelegate(readView: ReadView) : HorizontalPageDelegate(readVi
                 mMiddleX = (mTouchX + mCornerX) * 0.5f
                 mMiddleY = (mTouchY + mCornerY) * 0.5f
 
-                mBezierControl1.x =
-                    mMiddleX - (mCornerY - mMiddleY) * (mCornerY - mMiddleY) / (mCornerX - mMiddleX)
+                val newDeltaY = mCornerY - mMiddleY
+                val newDeltaX = mCornerX - mMiddleX
+
+                mBezierControl1.x = mMiddleX - newDeltaY * newDeltaY / newDeltaX
                 mBezierControl1.y = mCornerY.toFloat()
 
                 mBezierControl2.x = mCornerX.toFloat()
-                val f5 = mCornerY - mMiddleY
-                if (f5 == 0f) {
-                    mBezierControl2.y = mMiddleY - (mCornerX - mMiddleX) * (mCornerX - mMiddleX) / 0.1f
+                mBezierControl2.y = if (newDeltaY == 0f) {
+                    mMiddleY - newDeltaX * newDeltaX / 0.1f
                 } else {
-                    mBezierControl2.y = mMiddleY - (mCornerX - mMiddleX) * (mCornerX - mMiddleX) / (mCornerY - mMiddleY)
+                    mMiddleY - newDeltaX * newDeltaX / newDeltaY
                 }
 
                 mBezierStart1.x = mBezierControl1.x - (mCornerX - mBezierControl1.x) * 0.5f
