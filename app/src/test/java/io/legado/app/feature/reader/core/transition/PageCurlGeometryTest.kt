@@ -80,8 +80,12 @@ class PageCurlGeometryTest {
         assertTrue(topExit.start1.x < 0f)
     }
 
-    @Test fun simulationSettleDurationUsesItsFullLegacyCurlTravel() {
-        assertEquals(570, ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f))
+    @Test fun simulationSettleDurationCapsCornerFlipsAtTheBaseDuration() {
+        // 右下/中右/右上等右缘放行的角落翻页，收尾位移折算超过基准时长时封顶到
+        // 300ms；不封顶时会按剩余位移折算到约 570ms，明显慢于其他位置。
+        assertEquals(300, ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f))
+        // 基准时长内的位移按比例折算，保持匀速节奏（300 * 500 / 1000）。
+        assertEquals(150, ReaderCurlTouchPolicy.settleDurationMillis(500f, 1000f, 1000f))
         assertEquals(300, ReaderCurlTouchPolicy.settleDurationMillis(0f, 1000f, 1000f))
         assertEquals(0, ReaderCurlTouchPolicy.settleDurationMillis(1000f, 1000f, 1000f))
     }

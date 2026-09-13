@@ -50,18 +50,29 @@ object ReaderCurlVisualPolicy {
 }
 
 object ReaderCurlTouchPolicy {
+    /**
+     * 仿真收尾动画的基准/上限时长。对照旧 View `SimulationPageDelegate.onAnimStart`
+     * 还原后的 `startScroll(..., animationSpeed)`：收尾时长不随触点剩余位移无限拉长，
+     * 否则右缘放行的角落翻页（右下/中右/右上）会折算到约 570ms，明显慢于其他位置。
+     * 线性插值（[ReaderCanvasSurface] 的 LinearEasing）+ 固定上限后，各角落翻页的
+     * 收尾节奏一致且更快。
+     */
+    const val SETTLE_DURATION_MILLIS: Int = 300
+
     fun settleDurationMillis(
         currentX: Float,
         targetX: Float,
         pageWidth: Float,
-        baseDurationMillis: Int = 300,
+        baseDurationMillis: Int = SETTLE_DURATION_MILLIS,
     ): Int {
         if (pageWidth <= 0f || baseDurationMillis <= 0) return 0
         val distance = abs(targetX - currentX)
         if (distance < .01f) return 0
-        // A one- or two-pixel final travel previously rounded to 0 ms, committing the page
-        // before Compose had a chance to present the final curl frame.
-        return (baseDurationMillis * distance / pageWidth).toInt().coerceAtLeast(90)
+        // 距离近时按比例缩短，并保留 90ms 下限：一两个像素的末段位移此前会折算成
+        // 0ms，页面会在 Compose 呈现最终折页帧之前就被提交。距离远时封顶到基准
+        // 时长，让右下/中右/右上角落的收尾保持一致的匀速节奏。
+        return (baseDurationMillis * distance / pageWidth)
+            .toInt().coerceIn(90, baseDurationMillis)
     }
 
     /**
