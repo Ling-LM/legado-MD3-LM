@@ -80,11 +80,26 @@ class PageCurlGeometryTest {
         assertTrue(topExit.start1.x < 0f)
     }
 
-    @Test fun simulationSettleDurationUsesItsFullLegacyCurlTravel() {
-        // 基准已统一为 360（= 适中挡）：整段折页走满 360，1.9 屏折页距离按比例放大。
-        assertEquals(684, ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f))
+    @Test fun simulationSettleDurationIsCappedAtTheTurnBaseDuration() {
+        // 仿真角翻要滑约 1.9 屏，纯按位移折算会超过一档基准（默认 684ms）；
+        // 收尾封顶在基准时长，让仿真与覆盖 / 滑动一样快，不再拖出长尾。
+        assertEquals(360, ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f))
         assertEquals(360, ReaderCurlTouchPolicy.settleDurationMillis(0f, 1000f, 1000f))
         assertEquals(0, ReaderCurlTouchPolicy.settleDurationMillis(1000f, 1000f, 1000f))
+        // 封顶内仍按位移比例折算：半屏 = 半个基准。
+        assertEquals(180, ReaderCurlTouchPolicy.settleDurationMillis(0f, 500f, 1000f))
+    }
+
+    @Test fun simulationSettleCapFollowsTheTierBase() {
+        // 封顶跟着挡位走：极速挡整段折页不超过 240，优雅挡不超过 540。
+        assertEquals(
+            240,
+            ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f, baseDurationMillis = 240),
+        )
+        assertEquals(
+            540,
+            ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f, baseDurationMillis = 540),
+        )
     }
 
     @Test

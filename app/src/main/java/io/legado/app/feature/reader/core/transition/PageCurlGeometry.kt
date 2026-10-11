@@ -61,7 +61,10 @@ object ReaderCurlTouchPolicy {
 
     /**
      * 仿真折页收尾时长：按剩余折页距离折算到 [baseDurationMillis]（由当前挡位给定，
-     * 见 [ReaderPageTurnSpeed]）。
+     * 见 [ReaderPageTurnSpeed]），并封顶在基准时长。
+     *
+     * 角翻要滑约 1.9 屏，纯按位移折算会到 ~1.9 倍基准（默认 684ms），明显慢于
+     * 覆盖 / 滑动（同样按位移折算，但封顶在基准）。这里同样封顶，收尾不再拖出长尾。
      */
     fun settleDurationMillis(
         currentX: Float,
@@ -75,7 +78,8 @@ object ReaderCurlTouchPolicy {
         // A one- or two-pixel final travel previously rounded to 0 ms, committing the page
         // before Compose had a chance to present the final curl frame.
         val minDurationMillis = (baseDurationMillis * MIN_SETTLE_FRACTION).toInt().coerceAtLeast(1)
-        return (baseDurationMillis * distance / pageWidth).toInt().coerceAtLeast(minDurationMillis)
+        return (baseDurationMillis * distance / pageWidth)
+            .toInt().coerceIn(minDurationMillis, baseDurationMillis)
     }
 
     /**
