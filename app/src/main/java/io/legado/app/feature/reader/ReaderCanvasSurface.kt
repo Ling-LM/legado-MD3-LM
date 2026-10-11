@@ -51,7 +51,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -339,15 +338,11 @@ fun ReaderCanvasSurface(
     var curlTouchY by remember { mutableFloatStateOf(1f) }
     var curlTouchX by remember { mutableFloatStateOf(0f) }
     var curlCornerY by remember { mutableFloatStateOf(0f) }
-    // 快照层与位图池都在会话级持有、跨回合复用，对照旧 View `CanvasRecorderFactory` 的对象池与
-    // `curBitmap/prevBitmap/nextBitmap`：每个回合新建 `rememberGraphicsLayer()` 会丢掉这份复用。
-    val pageSnapshots = remember { PageSnapshotBitmapPool() }
+    // 快照层在会话级持有、跨回合复用，对照旧 View `CanvasRecorderFactory` 的对象池：
+    // 每个回合新建 `rememberGraphicsLayer()` 会丢掉这份复用。
     val baseSnapshotLayer = rememberGraphicsLayer()
     val revealSnapshotLayer = rememberGraphicsLayer()
     val autoPageSnapshotLayer = rememberGraphicsLayer()
-    DisposableEffect(Unit) {
-        onDispose { pageSnapshots.clear() }
-    }
     // 滚动偏移只在 graphicsLayer 块（layer 属性期）读取：拖拽/fling 帧只更新层变换、
     // 零重组零重绘（对照 shutiao 的 contentOffset 语义）。
     val scrollOffsetState = remember { mutableFloatStateOf(0f) }
@@ -1515,7 +1510,6 @@ fun ReaderCanvasSurface(
                 touchX = { curlTouchX },
                 touchY = { curlTouchY },
                 cornerY = { curlCornerY },
-                snapshots = pageSnapshots,
                 baseLayer = baseSnapshotLayer,
                 revealLayer = revealSnapshotLayer,
                 background = backgroundColor,
@@ -2092,7 +2086,6 @@ private fun SimulationPageStack(
     touchX: () -> Float,
     touchY: () -> Float,
     cornerY: () -> Float,
-    snapshots: PageSnapshotBitmapPool,
     baseLayer: GraphicsLayer,
     revealLayer: GraphicsLayer,
     background: Color,
@@ -2113,75 +2106,37 @@ private fun SimulationPageStack(
         val density = LocalDensity.current
         val width = with(density) { maxWidth.toPx() }
         val height = with(density) { maxHeight.toPx() }
-        val widthPx = width.roundToInt().coerceAtLeast(1)
-        val heightPx = height.roundToInt().coerceAtLeast(1)
-        val baseKey = remember(
-            basePage, background, backgroundImage, backgroundImageAlpha,
-            selection, readAloud, activeSelection, selectionPreviewStyle, widthPx, heightPx,
-        ) {
-            pageSnapshotKey(
-                basePage, background, backgroundImage, backgroundImageAlpha,
-                selection, readAloud, activeSelection, selectionPreviewStyle, widthPx, heightPx,
+        // 两页快照层常驻：折页每帧只 `drawLayer` 直接合成已录制的 RenderNode，
+        // 不做 `toImageBitmap()` 的 GPU→CPU 回读（对照旧 View CanvasRecorder 的 RenderNode 路径）。
+        PageSnapshotLayer(baseLayer) {
+            ReaderPageCanvas(
+                basePage,
+                background,
+                backgroundImage,
+                backgroundImageAlpha,
+                selection,
+                readAloud,
+                Modifier.fillMaxSize(),
+                activeSelection,
+                selectionPreviewStyle,
+                cachedImage,
+                loadImage
             )
         }
-        val revealKey = remember(
-            revealPage, background, backgroundImage, backgroundImageAlpha,
-            selection, readAloud, activeSelection, selectionPreviewStyle, widthPx, heightPx,
-        ) {
-            pageSnapshotKey(
-                revealPage, background, backgroundImage, backgroundImageAlpha,
-                selection, readAloud, activeSelection, selectionPreviewStyle, widthPx, heightPx,
+        PageSnapshotLayer(revealLayer) {
+            ReaderPageCanvas(
+                revealPage,
+                background,
+                backgroundImage,
+                backgroundImageAlpha,
+                selection,
+                readAloud,
+                Modifier.fillMaxSize(),
+                activeSelection,
+                selectionPreviewStyle,
+                cachedImage,
+                loadImage
             )
-        }
-        // 命中池子就用位图，连快照层都不用挂（该回合零页面重录）；未命中先走图层路径，
-        // 随后补拍 —— 一帧拍一页，把旧 View `setBitmap()` 那种"手势开始连拍两页"的卡顿摊开。
-        var baseBitmap by remember(baseKey) { mutableStateOf(snapshots.get(baseKey)) }
-        var revealBitmap by remember(revealKey) { mutableStateOf(snapshots.get(revealKey)) }
-        val baseSettled = basePage.isSnapshotSettled(cachedImage)
-        val revealSettled = revealPage.isSnapshotSettled(cachedImage)
-        LaunchedEffect(baseKey, revealKey, baseSettled, revealSettled) {
-            withFrameNanos { }
-            if (baseBitmap == null) {
-                snapshots.capture(baseLayer, baseKey, baseSettled)?.let { baseBitmap = it }
-            }
-            withFrameNanos { }
-            if (revealBitmap == null) {
-                snapshots.capture(revealLayer, revealKey, revealSettled)?.let { revealBitmap = it }
-            }
-        }
-        if (baseBitmap == null) {
-            PageSnapshotLayer(baseLayer) {
-                ReaderPageCanvas(
-                    basePage,
-                    background,
-                    backgroundImage,
-                    backgroundImageAlpha,
-                    selection,
-                    readAloud,
-                    Modifier.fillMaxSize(),
-                    activeSelection,
-                    selectionPreviewStyle,
-                    cachedImage,
-                    loadImage
-                )
-            }
-        }
-        if (revealBitmap == null) {
-            PageSnapshotLayer(revealLayer) {
-                ReaderPageCanvas(
-                    revealPage,
-                    background,
-                    backgroundImage,
-                    backgroundImageAlpha,
-                    selection,
-                    readAloud,
-                    Modifier.fillMaxSize(),
-                    activeSelection,
-                    selectionPreviewStyle,
-                    cachedImage,
-                    loadImage
-                )
-            }
         }
         Canvas(Modifier.fillMaxSize()) {
             val frame = PageCurlGeometry.calculate(
@@ -2194,13 +2149,13 @@ private fun SimulationPageStack(
             if (frame == null) {
                 // 折页几何退化（返回 null）时只剩底页，新页会整整一帧不见：用便宜的
                 // 水平平移兜底，保持目标页可见，等下一帧有效折页几何再恢复。
-                drawPageSnapshot(revealBitmap, revealLayer, widthPx, heightPx)
+                drawLayer(revealLayer)
                 val baseTranslation = when (direction) {
                     ReaderTurnDirection.NEXT -> pageOffsetPx()
                     ReaderTurnDirection.PREVIOUS -> pageOffsetPx() - width
                 }
                 withTransform({ translate(baseTranslation, 0f) }) {
-                    drawPageSnapshot(baseBitmap, baseLayer, widthPx, heightPx)
+                    drawLayer(baseLayer)
                 }
                 return@Canvas
             }
@@ -2210,164 +2165,31 @@ private fun SimulationPageStack(
             val pathBack = paths.back
             // 翻起页正面（挖掉折起的角）
             clipPath(path0, ClipOp.Difference) {
-                drawPageSnapshot(baseBitmap, baseLayer, widthPx, heightPx)
+                drawLayer(baseLayer)
             }
             // 折页下方露出的下一页
             clipPath(path0) {
                 clipPath(pathNext) {
-                    drawPageSnapshot(revealBitmap, revealLayer, widthPx, heightPx)
+                    drawLayer(revealLayer)
                     drawCurlBackShadow(frame)
                 }
             }
             // 翻起页背面（镜像的当前页）+ 折缝阴影
             clipPath(path0) { clipPath(pathBack) {
                 drawRect(background)
-                // Canvas.drawBitmap() in the View implementation naturally kept sampling
-                // within the screenshot's bounds. A transformed GraphicsLayer otherwise
-                // samples beyond its recorded page surface as opaque black on some devices,
-                // producing a dark wedge between the two sides of a curl. Clip in source
-                // coordinates first so uncovered back-page pixels retain the mean background
-                // color drawn above, while the complete background image remains mirrored.
+                // 变换后的快照层会采样到同页面板之外（部分设备呈现为黑色楔形），
+                // 在源坐标先裁剪，让未覆盖的页背像素保留上面画的平均底色，
+                // 同时完整的背景图仍保持镜像。
                 withTransform({
                     transform(paths.mirror)
                     clipRect(0f, 0f, size.width, size.height)
                 }) {
-                    drawPageSnapshot(baseBitmap, baseLayer, widthPx, heightPx)
+                    drawLayer(baseLayer)
                 }
                 drawCurlFolderShadow(frame)
             } }
             drawCurlFrontShadows(frame, paths)
         }
-    }
-}
-
-/**
- * 一页位图快照的身份。任何会改变该页像素的输入都必须进来，否则会命中过期位图：
- * 页 id/revision/layoutRevision（图片刷新会改 revision）、背景色/背景图及其透明度、
- * 选区与朗读高亮色、活动选区、选区预览样式、视口尺寸。
- */
-private data class PageSnapshotKey(
-    val pageId: ReaderPageId,
-    val revision: Long,
-    val layoutRevision: Long,
-    val backgroundArgb: Int,
-    val backgroundImageIdentity: Int,
-    val backgroundImageAlpha: Float,
-    val selectionArgb: Int,
-    val readAloudArgb: Int,
-    val activeSelection: ReaderSelection?,
-    val previewStyle: TextProcessStyle?,
-    val widthPx: Int,
-    val heightPx: Int,
-)
-
-private fun pageSnapshotKey(
-    page: ReaderPage,
-    background: Color,
-    backgroundImage: Drawable?,
-    backgroundImageAlpha: Float,
-    selection: Color,
-    readAloud: Color,
-    activeSelection: ReaderSelection?,
-    selectionPreviewStyle: TextProcessStyle?,
-    widthPx: Int,
-    heightPx: Int,
-): PageSnapshotKey = PageSnapshotKey(
-    pageId = page.id,
-    revision = page.revision,
-    layoutRevision = page.layoutRevision,
-    backgroundArgb = background.toArgb(),
-    backgroundImageIdentity = System.identityHashCode(backgroundImage),
-    backgroundImageAlpha = backgroundImageAlpha,
-    selectionArgb = selection.toArgb(),
-    readAloudArgb = readAloud.toArgb(),
-    activeSelection = activeSelection,
-    previewStyle = selectionPreviewStyle,
-    widthPx = widthPx,
-    heightPx = heightPx,
-)
-
-/**
- * 会话级页面位图快照池，对照旧 View 的 `curBitmap / prevBitmap / nextBitmap`。
- *
- * 旧 View 在 `setBitmap()` 里复用同一张 Bitmap 的内存；Compose 做不到：`GraphicsLayer.toImageBitmap()`
- * 每次都新建 Bitmap，`GraphicsLayer.draw` 是 internal，`Canvas.drawRenderNode` 又只能作用于硬件画布。
- * 所以这里按页身份缓存最近几页的位图。收益有两处：
- * ① 命中时该回合**完全不用重录页面**（快照层都不用挂载），每帧只做 blit；
- * ② 取消后再拖、或连续翻页时，只需补拍新进入窗口的那一页（否则每回合要重算两页）。
- */
-private class PageSnapshotBitmapPool {
-    private val entries = LinkedHashMap<PageSnapshotKey, ImageBitmap>(4, .75f, true)
-
-    fun get(key: PageSnapshotKey): ImageBitmap? = entries[key]
-
-    fun put(key: PageSnapshotKey, bitmap: ImageBitmap) {
-        if (bitmap.width <= 0 || bitmap.height <= 0) return
-        entries[key] = bitmap
-        while (entries.size > MAX_ENTRIES) {
-            val oldest = entries.entries.iterator()
-            if (!oldest.hasNext()) break
-            oldest.next()
-            oldest.remove()
-        }
-    }
-
-    /**
-     * 未命中且本页异步像素源都已就绪（[isSnapshotSettled]）时才栅格化进池子。
-     * 未就绪时返回 null，调用方继续用图层路径——否则会把"图片还没加载"的占位图固化进池子，
-     * 之后每次折页都拿它当快照。
-     */
-    suspend fun capture(
-        layer: GraphicsLayer,
-        key: PageSnapshotKey,
-        settled: Boolean
-    ): ImageBitmap? {
-        if (!settled) return null
-        entries[key]?.let { return it }
-        val bitmap = runCatching { layer.toImageBitmap() }.getOrNull() ?: return null
-        if (bitmap.width <= 0 || bitmap.height <= 0) return null
-        put(key, bitmap)
-        return bitmap
-    }
-
-    fun clear() = entries.clear()
-
-    private companion object {
-        /** 三张全屏 ARGB 位图 ≈ 旧 View 的 cur/prev/next 三张快照；再多就是白占内存。 */
-        const val MAX_ENTRIES = 3
-    }
-}
-
-/**
- * 该页的异步像素源是否都已就绪：内联图、文字背景图、书签角标。未就绪时不拍位图快照，
- * 否则会把"加载中"的占位内容固化进池子，之后每次折页都拿它当快照。
- */
-private fun ReaderPage.isSnapshotSettled(
-    cachedImage: (ReaderElement.Image) -> Bitmap?,
-): Boolean {
-    if (elements.any { it is ReaderElement.Image && cachedImage(it) == null }) return false
-    if (textBackgroundRuns().any { ReaderTextBackgroundLoader.cached(it.image.source) == null }) {
-        return false
-    }
-    val badge = decoration.bookmarkBadge ?: return true
-    return ReaderBookmarkBadgeRenderer.cachedResult(badge) != null
-}
-
-/** 有位图就用位图（一次 blit），否则退回快照层（display list 重放）。 */
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawPageSnapshot(
-    image: ImageBitmap?,
-    layer: GraphicsLayer,
-    widthPx: Int,
-    heightPx: Int,
-) {
-    if (image != null) {
-        drawImage(
-            image = image,
-            dstOffset = IntOffset.Zero,
-            dstSize = IntSize(widthPx, heightPx),
-        )
-    } else {
-        drawLayer(layer)
     }
 }
 
@@ -2408,6 +2230,33 @@ private fun ReaderTransitionTransforms.forRole(role: PagedLayerRole): ReaderPage
         PagedLayerRole.NEXT -> next
     }
 
+// 折页阴影的渐变画笔：颜色固定，渐变范围由绘制矩形决定（默认坐标的 `Brush` 会按绘制尺寸解析），
+// 于是能像旧 View 的 `GradientDrawable` 一样预建复用，避免每帧新建 Shader 造成 GC 抖动。
+private val frontShadowHorizontalForward = Brush.horizontalGradient(
+    listOf(Color.Transparent, Color(ReaderCurlVisualPolicy.frontShadowDarkArgb))
+)
+private val frontShadowHorizontalReverse = Brush.horizontalGradient(
+    listOf(Color(ReaderCurlVisualPolicy.frontShadowDarkArgb), Color.Transparent)
+)
+private val frontShadowVerticalForward = Brush.verticalGradient(
+    listOf(Color.Transparent, Color(ReaderCurlVisualPolicy.frontShadowDarkArgb))
+)
+private val frontShadowVerticalReverse = Brush.verticalGradient(
+    listOf(Color(ReaderCurlVisualPolicy.frontShadowDarkArgb), Color.Transparent)
+)
+private val backShadowForward = Brush.horizontalGradient(
+    listOf(Color.Transparent, Color(ReaderCurlVisualPolicy.backShadowDarkArgb))
+)
+private val backShadowReverse = Brush.horizontalGradient(
+    listOf(Color(ReaderCurlVisualPolicy.backShadowDarkArgb), Color.Transparent)
+)
+private val folderShadowForward = Brush.horizontalGradient(
+    listOf(Color(ReaderCurlVisualPolicy.folderShadowDarkArgb), Color.Transparent)
+)
+private val folderShadowReverse = Brush.horizontalGradient(
+    listOf(Color.Transparent, Color(ReaderCurlVisualPolicy.folderShadowDarkArgb))
+)
+
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCurlFrontShadows(
     frame: PageCurlFrame,
     paths: ReaderCurlRenderPaths,
@@ -2425,25 +2274,19 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCurlFrontShadow
             ) * 180.0 / PI).toFloat()
             withTransform({ rotate(rotation, Offset(frame.control1.x, frame.control1.y)) }) {
                 drawRect(
-                    Brush.horizontalGradient(
-                        if (reverse) listOf(
-                            Color(ReaderCurlVisualPolicy.frontShadowDarkArgb),
-                            Color.Transparent
-                        ) else listOf(
-                            Color.Transparent,
-                            Color(ReaderCurlVisualPolicy.frontShadowDarkArgb)
-                        ),
-                        left,
-                        right
-                    ),
-                    Offset(
+                    brush = if (reverse) {
+                        frontShadowHorizontalReverse
+                    } else {
+                        frontShadowHorizontalForward
+                    },
+                    topLeft = Offset(
                         left,
                         frame.control1.y - hypot(
                             size.width.toDouble(),
                             size.height.toDouble()
                         ).toFloat()
                     ),
-                    Size(
+                    size = Size(
                         right - left,
                         hypot(size.width.toDouble(), size.height.toDouble()).toFloat()
                     )
@@ -2466,17 +2309,13 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCurlFrontShadow
             val right = if (hmg > diagonal) frame.control2.x + diagonal - hmg else frame.control2.x
             withTransform({ rotate(rotation, Offset(frame.control2.x, frame.control2.y)) }) {
                 drawRect(
-                    Brush.verticalGradient(
-                        if (reverse) listOf(
-                            Color(ReaderCurlVisualPolicy.frontShadowDarkArgb),
-                            Color.Transparent
-                        ) else listOf(
-                            Color.Transparent,
-                            Color(ReaderCurlVisualPolicy.frontShadowDarkArgb)
-                        ),
-                        top,
-                        bottom
-                    ), Offset(left, top), Size(right - left, bottom - top)
+                    brush = if (reverse) {
+                        frontShadowVerticalReverse
+                    } else {
+                        frontShadowVerticalForward
+                    },
+                    topLeft = Offset(left, top),
+                    size = Size(right - left, bottom - top)
                 )
             }
         }
@@ -2562,7 +2401,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCurlBackShadow(
     val right = if (reverse) frame.start1.x + shadowWidth else frame.start1.x
     if (right <= left) return
     withTransform({ rotate(frame.degrees, Offset(frame.start1.x, frame.start1.y)) }) {
-        drawRect(Brush.horizontalGradient(if (reverse) listOf(Color(ReaderCurlVisualPolicy.backShadowDarkArgb), Color.Transparent) else listOf(Color.Transparent, Color(ReaderCurlVisualPolicy.backShadowDarkArgb)), left, right), Offset(left, frame.start1.y), Size(right - left, hypot(size.width.toDouble(), size.height.toDouble()).toFloat()))
+        drawRect(
+            brush = if (reverse) backShadowReverse else backShadowForward,
+            topLeft = Offset(left, frame.start1.y),
+            size = Size(right - left, hypot(size.width.toDouble(), size.height.toDouble()).toFloat()),
+        )
     }
 }
 
@@ -2572,7 +2415,11 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCurlFolderShado
     val left = if (reverse) frame.start1.x - 1f else frame.start1.x - width - 1f
     val right = if (reverse) frame.start1.x + width + 1f else frame.start1.x + 1f
     withTransform({ rotate(frame.degrees, Offset(frame.start1.x, frame.start1.y)) }) {
-        drawRect(Brush.horizontalGradient(if (reverse) listOf(Color.Transparent, Color(ReaderCurlVisualPolicy.folderShadowDarkArgb)) else listOf(Color(ReaderCurlVisualPolicy.folderShadowDarkArgb), Color.Transparent), left, right), Offset(left, frame.start1.y), Size(right - left, hypot(size.width.toDouble(), size.height.toDouble()).toFloat()))
+        drawRect(
+            brush = if (reverse) folderShadowReverse else folderShadowForward,
+            topLeft = Offset(left, frame.start1.y),
+            size = Size(right - left, hypot(size.width.toDouble(), size.height.toDouble()).toFloat()),
+        )
     }
 }
 

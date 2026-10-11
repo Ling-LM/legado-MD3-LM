@@ -80,28 +80,31 @@ class PageCurlGeometryTest {
         assertTrue(topExit.start1.x < 0f)
     }
 
-    @Test fun simulationSettleDurationIsCappedAtTheSimulationBaseDuration() {
-        // 仿真角翻要滑约 1.9 屏，纯按位移折算会超过折页基准；收尾封顶在折页基准
-        // （默认挡 320ms），让角翻不拖长尾。
+    @Test fun simulationSettleDurationScalesWithTheRemainingCurlTravel() {
+        // 不封顶：时长 = 基准 * 剩余位移 / 页宽，与旧 View `startScroll` 的
+        // `animationSpeed * |dx| / viewWidth` 同款。角翻全程约 1.9 屏 → 约 1.9 倍基准。
         val base = ReaderPageTurnSpeed.SIMULATION_BASE_DURATION_MILLIS
-        assertEquals(base, ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f))
+        // 0.9 屏 → -1.0 屏，位移 1.9 屏。
+        assertEquals(base * 19 / 10, ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f))
+        // 整屏。
         assertEquals(base, ReaderCurlTouchPolicy.settleDurationMillis(0f, 1000f, 1000f))
-        assertEquals(0, ReaderCurlTouchPolicy.settleDurationMillis(1000f, 1000f, 1000f))
-        // 封顶内仍按位移比例折算：半屏 = 半个基准。
+        // 半屏。
         assertEquals(base / 2, ReaderCurlTouchPolicy.settleDurationMillis(0f, 500f, 1000f))
+        // 无位移不启动。
+        assertEquals(0, ReaderCurlTouchPolicy.settleDurationMillis(1000f, 1000f, 1000f))
     }
 
-    @Test fun simulationSettleCapFollowsTheTierBase() {
-        // 封顶跟着挡位走：极速挡整段折页不超过其折页基准（200），优雅挡不超过 500。
+    @Test fun simulationSettleDurationScalesWithTheTierBase() {
+        // 同一位移下时长按挡位基准等比缩放：1.9 屏分别取极速 / 优雅挡。
         assertEquals(
-            ReaderPageTurnSpeed.FASTEST.simulationBaseDurationMillis,
+            ReaderPageTurnSpeed.FASTEST.simulationBaseDurationMillis * 19 / 10,
             ReaderCurlTouchPolicy.settleDurationMillis(
                 900f, -1000f, 1000f,
                 baseDurationMillis = ReaderPageTurnSpeed.FASTEST.simulationBaseDurationMillis,
             ),
         )
         assertEquals(
-            ReaderPageTurnSpeed.ELEGANT.simulationBaseDurationMillis,
+            ReaderPageTurnSpeed.ELEGANT.simulationBaseDurationMillis * 19 / 10,
             ReaderCurlTouchPolicy.settleDurationMillis(
                 900f, -1000f, 1000f,
                 baseDurationMillis = ReaderPageTurnSpeed.ELEGANT.simulationBaseDurationMillis,
