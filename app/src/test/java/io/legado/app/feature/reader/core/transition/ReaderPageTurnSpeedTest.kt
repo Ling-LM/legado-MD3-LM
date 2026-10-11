@@ -8,7 +8,7 @@ import org.junit.Test
  * 翻页动画速度挡位：四挡都是绝对基准时长（240 / 300 / **360 默认** / 540），
  * 且每个挡位都必须整体作用于覆盖/滑动/渐变、仿真折页、滚动翻屏三条路径。
  *
- * 仿真折页另有一份略快的基准（同挡位下比整页基准快 40ms，默认 320），
+ * 仿真折页另有一份更快的基准（同挡位下为整页基准的 2/3，默认 240），
  * 折算规则与挡位整体性一并钉在这里。
  */
 class ReaderPageTurnSpeedTest {
@@ -19,16 +19,16 @@ class ReaderPageTurnSpeedTest {
         assertEquals(300, ReaderPageTurnSpeed.FAST.baseDurationMillis)
         assertEquals(360, ReaderPageTurnSpeed.MODERATE.baseDurationMillis)
         assertEquals(540, ReaderPageTurnSpeed.ELEGANT.baseDurationMillis)
-        assertEquals(200, ReaderPageTurnSpeed.FASTEST.simulationBaseDurationMillis)
-        assertEquals(260, ReaderPageTurnSpeed.FAST.simulationBaseDurationMillis)
-        assertEquals(320, ReaderPageTurnSpeed.MODERATE.simulationBaseDurationMillis)
-        assertEquals(500, ReaderPageTurnSpeed.ELEGANT.simulationBaseDurationMillis)
+        assertEquals(160, ReaderPageTurnSpeed.FASTEST.simulationBaseDurationMillis)
+        assertEquals(200, ReaderPageTurnSpeed.FAST.simulationBaseDurationMillis)
+        assertEquals(240, ReaderPageTurnSpeed.MODERATE.simulationBaseDurationMillis)
+        assertEquals(360, ReaderPageTurnSpeed.ELEGANT.simulationBaseDurationMillis)
     }
 
     @Test
     fun `默认挡是 360ms 且等于统一基准`() {
         assertEquals(360, ReaderPageTurnSpeed.BASE_DURATION_MILLIS)
-        assertEquals(320, ReaderPageTurnSpeed.SIMULATION_BASE_DURATION_MILLIS)
+        assertEquals(240, ReaderPageTurnSpeed.SIMULATION_BASE_DURATION_MILLIS)
         assertEquals(ReaderPageTurnSpeed.MODERATE, ReaderPageTurnSpeed.Default)
         assertEquals(
             ReaderPageTurnSpeed.BASE_DURATION_MILLIS,
@@ -41,11 +41,11 @@ class ReaderPageTurnSpeedTest {
     }
 
     @Test
-    fun `仿真折页基准比同挡位整页基准快 40ms`() {
+    fun `仿真折页基准是同挡位整页基准的 2/3`() {
         ReaderPageTurnSpeed.entries.forEach { speed ->
             assertEquals(
-                "${speed.name} 挡仿真基准应为整页基准 - 40",
-                speed.baseDurationMillis - 40,
+                "${speed.name} 挡仿真基准应为整页基准的 2/3",
+                speed.baseDurationMillis * 2 / 3,
                 speed.simulationBaseDurationMillis,
             )
         }
@@ -53,10 +53,10 @@ class ReaderPageTurnSpeedTest {
 
     @Test
     fun `三条翻页路径的默认基准被钉住`() {
-        // 覆盖/滑动/渐变、滚动的默认基准 = 统一基准 360；仿真折页 = 320（快 40ms）。
+        // 覆盖/滑动/渐变、滚动的默认基准 = 统一基准 360；仿真折页 = 240（整页基准的 2/3）。
         // 任一路径另开一份常量，或仿真基准偏离统一基准，这条断言就会红。
         assertEquals(360, ReaderPageTransitionPolicy.settleDurationMillis(0f, -800f, 800f))
-        assertEquals(320, ReaderCurlTouchPolicy.settleDurationMillis(0f, 800f, 800f))
+        assertEquals(240, ReaderCurlTouchPolicy.settleDurationMillis(0f, 800f, 800f))
         assertEquals(360, ReaderScrollPolicy.stepDurationMillis(-800f, 800f))
     }
 
