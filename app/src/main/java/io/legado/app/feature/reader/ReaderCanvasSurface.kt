@@ -7,6 +7,7 @@ import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -532,10 +533,11 @@ fun ReaderCanvasSurface(
             curlCornerY,
             latestPages.current?.heightPx?.toFloat() ?: 0f,
         )
-        // 仿真收尾用匀速：折页滑出屏幕是收尾的主体动作，减速收尾会让它
-        // 在结束帧前停滞（对照原版 delegate 的 LinearEasing）。
+        // 仿真收尾以匀速为主（角翻匀速最顺），但起步加一小段缓入：直接以满速启动
+        // 会有一帧"顿"感。`FastOutLinearIn` 先加速再匀速，结尾不减速（不产生停滞，
+        // 对照原版 delegate 的 LinearInterpolator 手感）。
         val settleEasing = if (transitionMode == ReaderTransitionMode.SIMULATION) {
-            LinearEasing
+            FastOutLinearInEasing
         } else {
             FastOutSlowInEasing
         }

@@ -116,30 +116,30 @@ class PageCurlGeometryTest {
     fun simulationCurlSnapsAwayFromTheDegenerateCornerAndKeepsAVisibleFinalFrame() {
         assertEquals(960f, ReaderCurlTouchPolicy.dragX(ReaderTurnDirection.NEXT, 999f, 1000f))
         assertEquals(40f, ReaderCurlTouchPolicy.dragX(ReaderTurnDirection.PREVIOUS, 1f, 1000f))
-        assertEquals(60, ReaderCurlTouchPolicy.settleDurationMillis(999f, 1000f, 1000f))
+        assertEquals(54, ReaderCurlTouchPolicy.settleDurationMillis(999f, 1000f, 1000f))
     }
 
     @Test
     fun simulationSettleFloorScalesWithTheTierBase() {
-        // 下限取基准的 25%：默认折页基准 240 → 60，换挡后同步缩小/放大。
-        // 写死下限会让快速挡的短距离收尾慢得不成比例（60 / 160 = 38%）。
-        assertEquals(60, ReaderCurlTouchPolicy.settleDurationMillis(999f, 1000f, 1000f))
+        // 下限取基准的 25%：默认折页基准 216 → 54，换挡后同步缩小/放大。
+        // 写死下限会让快速挡的短距离收尾慢得不成比例（54 / 144 = 38%）。
+        assertEquals(54, ReaderCurlTouchPolicy.settleDurationMillis(999f, 1000f, 1000f))
         assertEquals(
-            40,
+            36,
             ReaderCurlTouchPolicy.settleDurationMillis(
                 999f,
                 1000f,
                 1000f,
-                baseDurationMillis = 160
+                baseDurationMillis = 144
             ),
         )
         assertEquals(
-            90,
+            81,
             ReaderCurlTouchPolicy.settleDurationMillis(
                 999f,
                 1000f,
                 1000f,
-                baseDurationMillis = 360
+                baseDurationMillis = 324
             ),
         )
     }
