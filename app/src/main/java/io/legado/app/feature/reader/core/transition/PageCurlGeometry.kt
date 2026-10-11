@@ -53,24 +53,24 @@ object ReaderCurlTouchPolicy {
     /**
      * 收尾下限占基准的比例。
      *
-     * 下限跟着基准走而不是写死 90ms：写死会让快速挡的短距离收尾慢得不成比例
-     * （90 / 240 = 37%，而 90 / 540 只有 17%），换挡就不再是「整体快慢」。
-     * 360ms 基准下这正好是原来的 90ms，默认挡逐帧不变。
+     * 下限跟着基准走而不是写死：写死会让快速挡的短距离收尾慢得不成比例
+     * （80 / 240 = 33%，而 80 / 500 只有 16%），换挡就不再是「整体快慢」。
+     * 320ms 基准下为 80ms。
      */
     private const val MIN_SETTLE_FRACTION = .25f
 
     /**
      * 仿真折页收尾时长：按剩余折页距离折算到 [baseDurationMillis]（由当前挡位给定，
-     * 见 [ReaderPageTurnSpeed]），并封顶在基准时长。
+     * 见 [ReaderPageTurnSpeed.simulationBaseDurationMillis]），并封顶在基准时长。
      *
-     * 角翻要滑约 1.9 屏，纯按位移折算会到 ~1.9 倍基准（默认 684ms），明显慢于
-     * 覆盖 / 滑动（同样按位移折算，但封顶在基准）。这里同样封顶，收尾不再拖出长尾。
+     * 角翻要滑约 1.9 屏，纯按位移折算会到 ~1.9 倍基准，明显慢于覆盖 / 滑动
+     * （同样按位移折算，但封顶在基准）。这里同样封顶，收尾不再拖出长尾。
      */
     fun settleDurationMillis(
         currentX: Float,
         targetX: Float,
         pageWidth: Float,
-        baseDurationMillis: Int = ReaderPageTurnSpeed.BASE_DURATION_MILLIS,
+        baseDurationMillis: Int = ReaderPageTurnSpeed.SIMULATION_BASE_DURATION_MILLIS,
     ): Int {
         if (pageWidth <= 0f || baseDurationMillis <= 0) return 0
         val distance = abs(targetX - currentX)
@@ -99,19 +99,6 @@ object ReaderCurlTouchPolicy {
             ReaderTurnDirection.PREVIOUS -> rawX.coerceIn(inset, pageWidth)
             ReaderTurnDirection.NEXT -> rawX.coerceIn(0f, pageWidth - inset)
         }
-    }
-
-    /** Interpolates the first safe fold out of its corner so the entering page does not pop in. */
-    fun revealX(
-        direction: ReaderTurnDirection,
-        targetX: Float,
-        pageWidth: Float,
-        revealProgress: Float,
-    ): Float {
-        if (pageWidth <= 0f) return targetX
-        val cornerX = if (direction == ReaderTurnDirection.NEXT) pageWidth else 0f
-        val progress = revealProgress.coerceIn(0f, 1f)
-        return cornerX + (targetX - cornerX) * progress
     }
 
     fun programmaticX(

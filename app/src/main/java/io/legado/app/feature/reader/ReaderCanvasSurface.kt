@@ -272,10 +272,6 @@ fun ReaderCanvasSurface(
         turnDirection = next.direction?.takeIf { next.dragging }
     }
     var pageMotionJob by remember { mutableStateOf<Job?>(null) }
-    // 折页第一帧从角点起：把它补间到安全折位，让进入页随动画揭开，而不是横向捕捉
-    // 开始时突然弹入
-    var curlRevealProgress by remember { mutableFloatStateOf(1f) }
-    var curlRevealJob by remember { mutableStateOf<Job?>(null) }
     var pendingTurn by remember { mutableStateOf<ReaderTurnDirection?>(null) }
     var pendingTurnOrigin by remember { mutableStateOf<ReaderPageId?>(null) }
     val latestPreviousPage by rememberUpdatedState(onPreviousPage)
@@ -327,7 +323,6 @@ fun ReaderCanvasSurface(
             displayOffset = 0f
             applyTransition(ReaderPageTransition())
             bookmarkReturnJob?.cancel()
-            curlRevealJob?.cancel()
             bookmarkOffset = 0f
             bookmarkArmed = false
         }
@@ -502,18 +497,6 @@ fun ReaderCanvasSurface(
             completePendingTurn()
         }
         pageMotionJob?.cancel()
-        curlRevealJob?.cancel()
-        if (transitionMode == ReaderTransitionMode.SIMULATION) {
-            transition.direction?.let { direction ->
-                curlTouchX = ReaderCurlTouchPolicy.revealX(
-                    direction,
-                    curlTouchX,
-                    transition.pageExtentPx,
-                    curlRevealProgress,
-                )
-            }
-            curlRevealProgress = 1f
-        }
         pendingTurn = transition.direction.takeIf { decision.commit }
         pendingTurnOrigin = currentPageWindow().current?.id
         if (transitionMode == ReaderTransitionMode.NONE) {
@@ -532,7 +515,7 @@ fun ReaderCanvasSurface(
                 curlTouchX,
                 targetCurlX,
                 transition.pageExtentPx,
-                baseDurationMillis = baseDurationMillis,
+                baseDurationMillis = latestPageTurnSpeed.simulationBaseDurationMillis,
             )
         } else {
             ReaderPageTransitionPolicy.settleDurationMillis(
@@ -593,7 +576,6 @@ fun ReaderCanvasSurface(
         }
         val width = window.current?.widthPx?.toFloat() ?: return
         if (transitionMode == ReaderTransitionMode.SIMULATION) {
-            curlRevealProgress = 1f
             curlTouchX = ReaderCurlTouchPolicy.programmaticX(direction, width)
             curlTouchY = ReaderCurlTouchPolicy.programmaticY(
                 direction, curlTouchY, window.current.heightPx.toFloat(),
@@ -608,16 +590,6 @@ fun ReaderCanvasSurface(
         settlePageTurn(ReaderTransitionDecision(target, commit = true))
     }
 
-    fun startCurlRevealSnap() {
-        curlRevealJob?.cancel()
-        curlRevealProgress = 0f
-        curlRevealJob = animationScope.launch {
-            Animatable(0f).animateTo(
-                1f,
-                tween(100, easing = FastOutSlowInEasing),
-            ) { curlRevealProgress = value }
-        }
-    }
     fun applyScrollResult(result: ReaderScrollResult, window: ReaderPageWindow) {
         val crossing = result.crossing
         if (crossing == null) {
@@ -971,8 +943,6 @@ fun ReaderCanvasSurface(
                 val down = awaitFirstDown(requireUnconsumed = false)
                 latestReaderInteraction()
                 pageMotionJob?.cancel()
-                curlRevealJob?.cancel()
-                curlRevealProgress = 1f
                 // 翻页收尾被打断时在此同步提交；宿主当帧返回新窗口，但组合要等下一帧，
                 // 手势必须改用返回的窗口命中，否则长按会选中已不在屏幕上的旧页。
                 val turnedWindow = completePendingTurn()
@@ -1258,7 +1228,6 @@ fun ReaderCanvasSurface(
                             if (horizontalTurn) {
                                 horizontalDrag = ReaderHorizontalDrag.capture(total.x)
                                 horizontalCapturedY = change.position.y
-                                if (transitionMode == ReaderTransitionMode.SIMULATION) startCurlRevealSnap()
                             }
                         }
                         if (bookmarkDrag) {
@@ -1287,7 +1256,6 @@ fun ReaderCanvasSurface(
                                 if (horizontalTurn) {
                                     horizontalDrag = ReaderHorizontalDrag.capture(total.x)
                                     horizontalCapturedY = change.position.y
-                                    if (transitionMode == ReaderTransitionMode.SIMULATION) startCurlRevealSnap()
                                 }
                             }
                         }
@@ -1543,12 +1511,10 @@ fun ReaderCanvasSurface(
             SimulationPageStack(
                 pages = pages,
                 direction = turnDirection!!,
-                pageExtentPx = current.widthPx.toFloat(),
                 pageOffsetPx = { displayOffset },
                 touchX = { curlTouchX },
                 touchY = { curlTouchY },
                 cornerY = { curlCornerY },
-                revealProgress = { curlRevealProgress },
                 snapshots = pageSnapshots,
                 baseLayer = baseSnapshotLayer,
                 revealLayer = revealSnapshotLayer,
@@ -2122,12 +2088,10 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScrollPageConte
 private fun SimulationPageStack(
     pages: ReaderPageWindow,
     direction: ReaderTurnDirection,
-    pageExtentPx: Float,
     pageOffsetPx: () -> Float,
     touchX: () -> Float,
     touchY: () -> Float,
     cornerY: () -> Float,
-    revealProgress: () -> Float,
     snapshots: PageSnapshotBitmapPool,
     baseLayer: GraphicsLayer,
     revealLayer: GraphicsLayer,
@@ -2223,7 +2187,7 @@ private fun SimulationPageStack(
             val frame = PageCurlGeometry.calculate(
                 width,
                 height,
-                ReaderCurlTouchPolicy.revealX(direction, touchX(), pageExtentPx, revealProgress()),
+                touchX(),
                 touchY().coerceIn(.1f, height - .1f),
                 lockedCorner = CurlPoint(width, cornerY()),
             )

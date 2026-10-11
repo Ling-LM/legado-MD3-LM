@@ -80,25 +80,32 @@ class PageCurlGeometryTest {
         assertTrue(topExit.start1.x < 0f)
     }
 
-    @Test fun simulationSettleDurationIsCappedAtTheTurnBaseDuration() {
-        // 仿真角翻要滑约 1.9 屏，纯按位移折算会超过一档基准（默认 684ms）；
-        // 收尾封顶在基准时长，让仿真与覆盖 / 滑动一样快，不再拖出长尾。
-        assertEquals(360, ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f))
-        assertEquals(360, ReaderCurlTouchPolicy.settleDurationMillis(0f, 1000f, 1000f))
+    @Test fun simulationSettleDurationIsCappedAtTheSimulationBaseDuration() {
+        // 仿真角翻要滑约 1.9 屏，纯按位移折算会超过折页基准；收尾封顶在折页基准
+        // （默认挡 320ms），让角翻不拖长尾。
+        val base = ReaderPageTurnSpeed.SIMULATION_BASE_DURATION_MILLIS
+        assertEquals(base, ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f))
+        assertEquals(base, ReaderCurlTouchPolicy.settleDurationMillis(0f, 1000f, 1000f))
         assertEquals(0, ReaderCurlTouchPolicy.settleDurationMillis(1000f, 1000f, 1000f))
         // 封顶内仍按位移比例折算：半屏 = 半个基准。
-        assertEquals(180, ReaderCurlTouchPolicy.settleDurationMillis(0f, 500f, 1000f))
+        assertEquals(base / 2, ReaderCurlTouchPolicy.settleDurationMillis(0f, 500f, 1000f))
     }
 
     @Test fun simulationSettleCapFollowsTheTierBase() {
-        // 封顶跟着挡位走：极速挡整段折页不超过 240，优雅挡不超过 540。
+        // 封顶跟着挡位走：极速挡整段折页不超过其折页基准（200），优雅挡不超过 500。
         assertEquals(
-            240,
-            ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f, baseDurationMillis = 240),
+            ReaderPageTurnSpeed.FASTEST.simulationBaseDurationMillis,
+            ReaderCurlTouchPolicy.settleDurationMillis(
+                900f, -1000f, 1000f,
+                baseDurationMillis = ReaderPageTurnSpeed.FASTEST.simulationBaseDurationMillis,
+            ),
         )
         assertEquals(
-            540,
-            ReaderCurlTouchPolicy.settleDurationMillis(900f, -1000f, 1000f, baseDurationMillis = 540),
+            ReaderPageTurnSpeed.ELEGANT.simulationBaseDurationMillis,
+            ReaderCurlTouchPolicy.settleDurationMillis(
+                900f, -1000f, 1000f,
+                baseDurationMillis = ReaderPageTurnSpeed.ELEGANT.simulationBaseDurationMillis,
+            ),
         )
     }
 
@@ -106,14 +113,14 @@ class PageCurlGeometryTest {
     fun simulationCurlSnapsAwayFromTheDegenerateCornerAndKeepsAVisibleFinalFrame() {
         assertEquals(960f, ReaderCurlTouchPolicy.dragX(ReaderTurnDirection.NEXT, 999f, 1000f))
         assertEquals(40f, ReaderCurlTouchPolicy.dragX(ReaderTurnDirection.PREVIOUS, 1f, 1000f))
-        assertEquals(90, ReaderCurlTouchPolicy.settleDurationMillis(999f, 1000f, 1000f))
+        assertEquals(80, ReaderCurlTouchPolicy.settleDurationMillis(999f, 1000f, 1000f))
     }
 
     @Test
     fun simulationSettleFloorScalesWithTheTierBase() {
-        // 下限取基准的 25%：默认 360 → 90（与改造前一致），换挡后同步缩小/放大。
-        // 写死 90ms 会让快速挡的短距离收尾慢得不成比例（90 / 240 = 37%）。
-        assertEquals(90, ReaderCurlTouchPolicy.settleDurationMillis(999f, 1000f, 1000f))
+        // 下限取基准的 25%：默认折页基准 320 → 80，换挡后同步缩小/放大。
+        // 写死下限会让快速挡的短距离收尾慢得不成比例（80 / 240 = 33%）。
+        assertEquals(80, ReaderCurlTouchPolicy.settleDurationMillis(999f, 1000f, 1000f))
         assertEquals(
             60,
             ReaderCurlTouchPolicy.settleDurationMillis(
@@ -131,22 +138,6 @@ class PageCurlGeometryTest {
                 1000f,
                 baseDurationMillis = 540
             ),
-        )
-    }
-
-    @Test
-    fun simulationCurlRevealsTheSafeSnapContinuouslyFromTheTouchedCorner() {
-        assertEquals(
-            1000f,
-            ReaderCurlTouchPolicy.revealX(ReaderTurnDirection.NEXT, 960f, 1000f, 0f)
-        )
-        assertEquals(
-            980f,
-            ReaderCurlTouchPolicy.revealX(ReaderTurnDirection.NEXT, 960f, 1000f, .5f)
-        )
-        assertEquals(
-            40f,
-            ReaderCurlTouchPolicy.revealX(ReaderTurnDirection.PREVIOUS, 80f, 1000f, .5f)
         )
     }
 
