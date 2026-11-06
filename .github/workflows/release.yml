@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   release:
-    if: github.actor == 'HapeLee' && github.ref == 'refs/heads/main'
+    if: github.actor == 'Ling-LM' && github.ref == 'refs/heads/mainmd3'
     uses: ./.github/workflows/auto-release.yml
     with:
       publish: true

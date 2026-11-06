@@ -39,18 +39,25 @@ Transform tasks into verifiable goals:
 
 ## Build / Test / Run
 
+> `:app` 用 `mode`(app) × `engine`(core/comic) 两个维度出变体，任务名必须带产品段：
+> `appCoreDebug` / `appComicDebug` 等。旧的 `AppDebug` / `AppRelease` / `AppNoR8` 系列
+> 已不存在；只写 `assembleAppDebug` 会因 `app*` 变体歧义报 TaskSelectionException
+> （候选：`assembleAppComicDebug`、`assembleAppCoreDebug` …），必须显式选择产品。
+
 ```bash
 # Quick compile check (Kotlin only, no dex/package — fastest for verifying code compiles)
-.\gradlew.bat :app:compileAppDebugKotlin
+.\gradlew.bat :app:compileAppCoreDebugKotlin
+.\gradlew.bat :app:compileAppComicDebugKotlin
 
-# Assemble all variants
-./gradlew assembleAppRelease
+# Assemble all release variants
+./gradlew assembleAppCoreRelease assembleAppComicRelease
 
 # Assemble without R8 (for crash debugging — no minification/shrinking)
-./gradlew assembleAppNoR8
+./gradlew assembleAppCoreNoR8 assembleAppComicNoR8
 
-# Debug build
-./gradlew assembleAppDebug
+# Debug build（core = 基础包, comic = 漫画增强包）
+./gradlew assembleAppCoreDebug
+./gradlew assembleAppComicDebug
 
 # Run unit tests (JVM, local)
 ./gradlew test

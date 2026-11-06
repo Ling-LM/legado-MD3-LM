@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - mainmd3
     paths-ignore:
       - '**/modules/web/**'
   pull_request:
