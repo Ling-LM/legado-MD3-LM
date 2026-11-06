@@ -500,8 +500,8 @@ jobs:
               "TELEGRAM_CHAT_ID": chat_id,
           }.items() if not value]
           if missing:
-              print(f"缺少 Telegram Secret: {', '.join(missing)}")
-              sys.exit(1)
+              print(f"未配置 Telegram Secret（{', '.join(missing)}），跳过 Telegram 发布，不影响 GitHub Release。")
+              sys.exit(0)
 
           def to_plain_text(text):
               lines = []
