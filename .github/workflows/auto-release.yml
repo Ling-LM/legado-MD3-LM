@@ -165,6 +165,12 @@ jobs:
         if: ${{ github.actor == 'Ling-LM' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         shell: bash
         run: |
+          # 签名所需的密码类 secret 缺失时直接给出清晰提示，避免后面 keystore 报错难懂。
+          if [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ] || [ -z "${{ secrets.KEY_ALIAS }}" ] || [ -z "${{ secrets.KEY_PASSWORD }}" ]; then
+            echo "::error::缺少签名 secrets，请在 Settings → Secrets and variables → Actions 配置 KEYSTORE_PASSWORD、KEY_ALIAS、KEY_PASSWORD"
+            exit 1
+          fi
+
           # 优先用 secrets.SIGNING_KEY（base64 解码到 app/my-release-key.jks）；
           # 未配置 SIGNING_KEY 时，直接使用仓库内置的签名文件 .github/workflows/legado.jks，
           # 这样只需填 KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD 三个密码类 secret。
