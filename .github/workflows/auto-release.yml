@@ -135,7 +135,7 @@ jobs:
         # 两个产品同时发布：core 基础版（无本地推理）与 comic 漫画增强版（内置 OCR/擦除/气泡检测）。
         # 两者的 APK 名与 artifact 名都必须带 product 前缀，否则同一 Release 内会互相覆盖。
         product: [ appCore, appComic ]
-        type: [ release ]
+        type: [ selfsigned ]
       fail-fast: false
     runs-on: ubuntu-latest
     env:
@@ -212,7 +212,7 @@ jobs:
           APP_VERSION_NAME: ${{ env.VERSIONL }}
 
       - name: Move Mapping Files
-        if: matrix.type == 'release'
+        if: matrix.type == 'selfsigned'
         run: |
           echo "移动 mapping 相关文件"
           MAPPING_DIR="${{ github.workspace }}/mapping"
@@ -222,7 +222,7 @@ jobs:
           find ${{ github.workspace }}/app/build/outputs/mapping/ -name "mapping.txt" -exec mv {} "$MAPPING_DIR/mapping.txt" \;
 
       - name: Upload Missing Rules File To Artifact
-        if: matrix.type == 'release'
+        if: matrix.type == 'selfsigned'
         uses: actions/upload-artifact@v4
         with:
           name: legado.${{ env.product }}.${{ env.type }}.mapping.missing_rules
@@ -261,7 +261,7 @@ jobs:
           path: app/build/outputs/apk/${{ env.product }}/${{ env.type }}/*armeabi-v7a*.apk
 
       - name: Upload Mapping File To Artifact
-        if: matrix.type == 'release'
+        if: matrix.type == 'selfsigned'
         uses: actions/upload-artifact@v4
         with:
           name: legado.${{ env.product }}.${{ env.type }}.mapping
@@ -269,7 +269,7 @@ jobs:
           path: ${{ github.workspace }}/mapping/mapping.txt
 
       - name: Save release metadata
-        if: matrix.type == 'release'
+        if: matrix.type == 'selfsigned'
         run: |
           {
             echo "VERSIONL=${{ needs.prepare.outputs.versionL }}"
@@ -278,7 +278,7 @@ jobs:
           } > release-metadata.env
 
       - name: Upload Release Metadata
-        if: matrix.type == 'release'
+        if: matrix.type == 'selfsigned'
         uses: actions/upload-artifact@v4
         with:
           name: release-metadata
@@ -300,7 +300,7 @@ jobs:
       - name: 下载所有 APK Artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: '*-apk-app*-release'
+          pattern: '*-apk-app*-selfsigned'
           path: artifacts
           merge-multiple: true
 
@@ -308,7 +308,7 @@ jobs:
       - name: 下载 Mapping Artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: 'legado.app*.release.mapping'
+          pattern: 'legado.app*.selfsigned.mapping'
           path: mapping-artifacts
           merge-multiple: false
 

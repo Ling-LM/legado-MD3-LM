@@ -126,6 +126,19 @@ android {
                 "cronet-proguard-rules.pro"
             )
         }
+        // 共存版：给「自签名」留一个与公共版并存安装的构建类型。
+        // 同一 applicationId 下不同签名无法共存/覆盖，因此包名加 .lm 后缀（google-services.json
+        // 已补充对应 client）。除包名与版本后缀外继承 release 的压缩/R8 行为。
+        create("selfsigned") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".lm"
+            versionNameSuffix = "-lm"
+            matchingFallbacks += listOf("release")
+            manifestPlaceholders["app_name"] = "@string/app_name"
+            if (project.hasProperty("RELEASE_STORE_FILE")) {
+                signingConfig = signingConfigs.getByName("myConfig")
+            }
+        }
     }
 
     splits {

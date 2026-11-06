@@ -53,7 +53,7 @@ androidComponents {
     beforeVariants { v ->
         // baseline profile 只针对 core 采集；comic 的本地引擎体积与启动路径另算。
         val comic = v.productFlavors.any { it.second == "comic" }
-        if (v.buildType == "noR8" || v.buildType == "debug" || comic) {
+        if (v.buildType == "noR8" || v.buildType == "debug" || v.buildType == "selfsigned" || comic) {
             v.enable = false
         }
     }
