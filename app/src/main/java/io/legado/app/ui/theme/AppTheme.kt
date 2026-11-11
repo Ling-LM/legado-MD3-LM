@@ -1,11 +1,16 @@
 package io.legado.app.ui.theme
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -15,6 +20,7 @@ import com.materialkolor.PaletteStyle
 import io.legado.app.domain.model.settings.AppUiConfiguration
 import io.legado.app.domain.model.settings.customColors
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import ui.feice.mochi.basic.mochiSheetBackdrop
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -24,11 +30,13 @@ fun AppTheme(
     applyBackground: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val currentContent by rememberUpdatedState(content)
+    val themedContent = remember { movableContentOf { currentContent() } }
     CompositionLocalProvider(LocalAppUiConfiguration provides configuration) {
         if (LocalInspectionMode.current) {
-            AppThemePreview(darkTheme, applyBackground, content)
+            AppThemePreview(darkTheme, applyBackground, themedContent)
         } else {
-            AppThemeActual(configuration, darkTheme, applyBackground, content)
+            AppThemeActual(configuration, darkTheme, applyBackground, themedContent)
         }
     }
 }
@@ -48,7 +56,7 @@ private fun AppThemePreview(
         paletteStyle = PaletteStyle.TonalSpot,
         themeMode = if (darkTheme) ColorSchemeMode.Dark else ColorSchemeMode.Light,
         useDynamicColor = false,
-        composeEngine = "material"
+        composeEngine = ComposeEngine.Material
     )
     CompositionLocalProvider(
         LocalLegadoThemeColors provides themeColors,
@@ -81,7 +89,8 @@ private fun AppThemeActual(
     val paletteStyleValue = themeSettings.paletteStyle
     val materialVersion = themeSettings.materialVersion
     val customContrast = themeSettings.customContrast
-    val composeEngine = appShellSettings.composeEngine
+    val composeEngine = ThemeResolver.resolveComposeEngine(appShellSettings.composeEngine)
+    val useCouiDefaultColors = composeEngine == ComposeEngine.Coui && appThemeMode == AppThemeMode.Dynamic
     val customPrimary = themeSettings.customPrimary
     val customNightPrimary = themeSettings.customNightPrimary
     val appFontPath = themeSettings.appFontPath
@@ -102,7 +111,7 @@ private fun AppThemeActual(
     val colorScheme = remember(
         context, appThemeMode, effectiveDarkTheme, isPureBlack, customPrimary, customNightPrimary,
         enableDeepPersonalization, customColors,
-        paletteStyleValue, materialVersion, customContrast,
+        paletteStyleValue, materialVersion, customContrast, composeEngine,
     ) {
         if (appThemeMode == AppThemeMode.Custom &&
             enableDeepPersonalization &&
@@ -128,6 +137,7 @@ private fun AppThemeActual(
                 materialVersion = materialVersion,
                 customSeedColor = customSeedColor,
                 customContrast = customContrast,
+                composeEngine = composeEngine,
             )
         }
     }
@@ -161,7 +171,7 @@ private fun AppThemeActual(
             seedColor = themeSeedColor,
             paletteStyle = paletteStyle,
             themeMode = colorSchemeMode,
-            useDynamicColor = appThemeMode == AppThemeMode.Dynamic,
+            useDynamicColor = appThemeMode == AppThemeMode.Dynamic && !useCouiDefaultColors,
             composeEngine = composeEngine
         )
     }
@@ -171,20 +181,45 @@ private fun AppThemeActual(
         LocalLegadoThemeColors provides themeColors,
         LocalDensity provides appDensity,
     ) {
-        if (ThemeResolver.isMiuixEngine(themeColors.composeEngine)) {
-            MiuixThemeWrapper(
-                themeColors = themeColors,
-                customFontFamily = customFontFamily,
-                applyBackground = applyBackground,
-                content = content
-            )
-        } else {
-            MaterialThemeWrapper(
-                themeColors = themeColors,
-                customFontFamily = customFontFamily,
-                applyBackground = applyBackground,
-                content = content
-            )
+        when (themeColors.composeEngine) {
+            ComposeEngine.Miuix -> {
+                MiuixThemeWrapper(
+                    themeColors = themeColors,
+                    customFontFamily = customFontFamily,
+                    applyBackground = applyBackground,
+                    content = content
+                )
+            }
+            ComposeEngine.Mochi -> {
+                val parentRegistry = LocalMochiBackdropRegistry.current
+                val registry = parentRegistry ?: remember { MochiBackdropRegistry() }
+                CompositionLocalProvider(LocalMochiBackdropRegistry provides registry) {
+                    val themedContent: @Composable () -> Unit = {
+                        MaterialThemeWrapper(themeColors, customFontFamily, applyBackground) {
+                            ProvideMochiTheme(themeColors.colorScheme, themeColors.isDark, content = content)
+                        }
+                    }
+                    if (parentRegistry == null) {
+                        val backdrop = registry.currentSheet?.let { Modifier.mochiSheetBackdrop(it) }
+                        Box(backdrop ?: Modifier, propagateMinConstraints = true) { themedContent() }
+                    } else {
+                        themedContent()
+                    }
+                }
+            }
+            ComposeEngine.Material, ComposeEngine.Coui -> {
+                MaterialThemeWrapper(
+                    themeColors = themeColors,
+                    customFontFamily = customFontFamily,
+                    applyBackground = applyBackground,
+                ) {
+                    if (themeColors.composeEngine == ComposeEngine.Coui && ThemeResolver.isCouiSupported()) {
+                        ProvideCouiTheme(themeColors.isDark, useCouiDefaultColors, content)
+                    } else {
+                        content()
+                    }
+                }
+            }
         }
     }
 }
